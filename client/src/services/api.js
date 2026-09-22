@@ -41,6 +41,22 @@ export const api = {
   getRemedies: () => request('/remedies'),
   getRemedy: (id) => request(`/remedies/${id}`),
   getRemedyRubrics: (id) => request(`/remedies/${id}/rubrics`),
+  addRemedy: (data) => request('/remedies', { method: 'POST', body: JSON.stringify(data) }),
+  updateRemedy: (id, data) =>
+    request(`/remedies/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRemedy: (id) => request(`/remedies/${id}`, { method: 'DELETE' }),
+  addRemedyRubric: (id, rubricId, grade) =>
+    request(`/remedies/${id}/rubrics`, {
+      method: 'POST',
+      body: JSON.stringify({ rubric_id: rubricId, grade }),
+    }),
+  updateRemedyRubricGrade: (id, rubricId, grade) =>
+    request(`/remedies/${id}/rubrics/${rubricId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ grade }),
+    }),
+  deleteRemedyRubric: (id, rubricId) =>
+    request(`/remedies/${id}/rubrics/${rubricId}`, { method: 'DELETE' }),
 
   // রুব্রিক
   getRubrics: (section) => request(`/rubrics${section ? `?section=${encodeURIComponent(section)}` : ''}`),

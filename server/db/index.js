@@ -17,5 +17,8 @@ const remedyCols = db.prepare('PRAGMA table_info(remedies)').all().map((c) => c.
 for (const col of ['clinical', 'better', 'worse']) {
   if (!remedyCols.includes(col)) db.exec(`ALTER TABLE remedies ADD COLUMN ${col} TEXT`);
 }
+if (!remedyCols.includes('is_custom')) {
+  db.exec('ALTER TABLE remedies ADD COLUMN is_custom INTEGER DEFAULT 0');
+}
 
 export default db;
