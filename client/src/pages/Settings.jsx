@@ -19,6 +19,13 @@ export default function Settings() {
   const [msg, setMsg] = useState('');
   const [ok, setOk] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [backupMsg, setBackupMsg] = useState('');
+  const [backupOk, setBackupOk] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [pwMsg, setPwMsg] = useState('');
+  const [pwOk, setPwOk] = useState(false);
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
   useEffect(() => {
     api.getSettings()
@@ -54,6 +61,76 @@ export default function Settings() {
       setMsg(err.message); setOk(false);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ব্যাকআপ ডাউনলোড
+  const downloadBackup = async () => {
+    setBackupBusy(true);
+    setBackupMsg('');
+    try {
+      const backup = await api.exportBackup();
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `homeopathy-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBackupMsg('ব্যাকআপ ডাউনলোড সম্পন্ন'); setBackupOk(true);
+    } catch (err) {
+      setBackupMsg(err.message); setBackupOk(false);
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  // ব্যাকআপ রিস্টোর
+  const restoreBackup = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!confirm('সতর্কতা: সব বর্তমান ডেটা মুছে গিয়ে ব্যাকআপের ডেটা বসবে। চালিয়ে যাবেন?')) {
+      e.target.value = '';
+      return;
+    }
+
+    setBackupBusy(true);
+    setBackupMsg('');
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text);
+      const result = await api.importBackup(backup);
+      setBackupMsg(result.message || 'ব্যাকআপ রিস্টোর সম্পন্ন'); setBackupOk(true);
+      // রিস্টোরের পর সেটিংস রিফ্রেশ
+      api.getSettings().then((s) => setForm((f) => ({ ...f, ...s }))).catch(() => {});
+    } catch (err) {
+      setBackupMsg('রিস্টোর ব্যর্থ: ' + err.message); setBackupOk(false);
+    } finally {
+      setBackupBusy(false);
+      e.target.value = '';
+    }
+  };
+
+  // পাসওয়ার্ড পরিবর্তন
+  const changePassword = async (e) => {
+    e.preventDefault();
+    setPwMsg('');
+
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      setPwMsg('নতুন পাসওয়ার্ড দুটি মিলছে না'); setPwOk(false);
+      return;
+    }
+
+    setPwBusy(true);
+    try {
+      const result = await api.changePassword(pwForm.currentPassword, pwForm.newPassword);
+      setPwMsg(result.message || 'পাসওয়ার্ড পরিবর্তিত হয়েছে'); setPwOk(true);
+      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      setPwMsg(err.message); setPwOk(false);
+    } finally {
+      setPwBusy(false);
     }
   };
 
@@ -137,6 +214,107 @@ export default function Settings() {
           className="bg-teal-600 text-white rounded-md px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
         >
           {saving ? 'সংরক্ষণ হচ্ছে…' : 'সংরক্ষণ করো'}
+        </button>
+      </form>
+
+      {/* ব্যাকআপ সেকশন */}
+      <div className="bg-white rounded-xl shadow p-5 space-y-4 max-w-2xl">
+        <div>
+          <h3 className="text-lg font-bold text-gray-800">ডেটা ব্যাকআপ</h3>
+          <p className="text-sm text-gray-500">
+            সব রোগী, কেস, প্রেসক্রিপশন ও সেটিংস JSON ফাইলে সংরক্ষণ করুন বা পূর্বে সংরক্ষিত ব্যাকআপ ফিরিয়ে আনুন।
+          </p>
+        </div>
+
+        {backupMsg && (
+          <div className={`text-sm px-3 py-2 rounded ${backupOk ? 'text-teal-700 bg-teal-50' : 'text-red-600 bg-red-50'}`}>
+            {backupMsg}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={downloadBackup}
+            disabled={backupBusy}
+            className="bg-amber-600 text-white rounded-md px-4 py-2 hover:bg-amber-700 disabled:opacity-50"
+          >
+            {backupBusy ? 'প্রস্তুত হচ্ছে…' : '⬇ ব্যাকআপ ডাউনলোড'}
+          </button>
+
+          <label className="bg-teal-600 text-white rounded-md px-4 py-2 hover:bg-teal-700 cursor-pointer disabled:opacity-50 inline-flex items-center">
+            {backupBusy ? 'প্রস্তুত হচ্ছে…' : '⬆ ব্যাকআপ রিস্টোর'}
+            <input
+              type="file"
+              accept=".json,application/json"
+              onChange={restoreBackup}
+              disabled={backupBusy}
+              className="hidden"
+            />
+          </label>
+        </div>
+
+        <p className="text-xs text-gray-400">
+          💡 নিয়মিত ব্যাকআপ নিন। রিস্টোর করলে বর্তমান সব ডেটা মুছে যাবে এবং ব্যাকআপের ডেটা বসবে।
+        </p>
+      </div>
+
+      {/* পাসওয়ার্ড পরিবর্তন সেকশন */}
+      <form onSubmit={changePassword} className="bg-white rounded-xl shadow p-5 space-y-4 max-w-2xl">
+        <div>
+          <h3 className="text-lg font-bold text-gray-800">পাসওয়ার্ড পরিবর্তন</h3>
+          <p className="text-sm text-gray-500">
+            প্রথমবার ডিফল্ট পাসওয়ার্ড <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">admin</code> দিয়ে লগইন করলে এখান থেকে নিজের পাসওয়ার্ড সেট করুন।
+          </p>
+        </div>
+
+        {pwMsg && (
+          <div className={`text-sm px-3 py-2 rounded ${pwOk ? 'text-teal-700 bg-teal-50' : 'text-red-600 bg-red-50'}`}>
+            {pwMsg}
+          </div>
+        )}
+
+        <div className="grid sm:grid-cols-3 gap-4">
+          <div>
+            <label className={label}>পুরনো পাসওয়ার্ড</label>
+            <input
+              type="password"
+              className={input}
+              value={pwForm.currentPassword}
+              onChange={(e) => setPwForm({ ...pwForm, currentPassword: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className={label}>নতুন পাসওয়ার্ড</label>
+            <input
+              type="password"
+              className={input}
+              value={pwForm.newPassword}
+              onChange={(e) => setPwForm({ ...pwForm, newPassword: e.target.value })}
+              required
+              minLength={4}
+            />
+          </div>
+          <div>
+            <label className={label}>নতুন পাসওয়ার্ড আবার</label>
+            <input
+              type="password"
+              className={input}
+              value={pwForm.confirmPassword}
+              onChange={(e) => setPwForm({ ...pwForm, confirmPassword: e.target.value })}
+              required
+              minLength={4}
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={pwBusy}
+          className="bg-teal-600 text-white rounded-md px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
+        >
+          {pwBusy ? 'পরিবর্তন হচ্ছে…' : 'পাসওয়ার্ড পরিবর্তন করো'}
         </button>
       </form>
     </div>

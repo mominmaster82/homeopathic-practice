@@ -2,12 +2,26 @@
 const base = '/api';
 
 async function request(path, options = {}) {
+  // localStorage থেকে টোকেন নাও
+  const token = localStorage.getItem('auth_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
   const res = await fetch(`${base}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers,
   });
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
+    // 401 হলে টোকেন মুছে ফেলো (মেয়াদোত্তীর্ণ বা অবৈধ)
+    if (res.status === 401 && token) {
+      localStorage.removeItem('auth_token');
+      window.location.href = '/login';
+    }
     throw new Error(err.error || 'সার্ভার ত্রুটি');
   }
   return res.json();
@@ -59,4 +73,18 @@ export const api = {
   getSettings: () => request('/settings'),
   updateSettings: (data) =>
     request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+
+  // ব্যাকআপ
+  exportBackup: () => request('/backup/export'),
+  importBackup: (data) =>
+    request('/backup/import', { method: 'POST', body: JSON.stringify(data) }),
+
+  // auth
+  login: (password) =>
+    request('/auth/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  changePassword: (currentPassword, newPassword) =>
+    request('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
 };
