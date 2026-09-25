@@ -5,11 +5,11 @@ import { api } from '../services/api.js';
 // গ্রেড দেখানোর জন্য তিনটি বিন্দু (● ● ●)
 function GradeDots({ grade }) {
   return (
-    <span className="inline-flex items-center gap-0.5" title={`গ্রেড ${grade}`}>
+    <span className="inline-flex items-center gap-0.5 shrink-0" title={`গ্রেড ${grade}`}>
       {[1, 2, 3].map((n) => (
         <span
           key={n}
-          className={`w-1.5 h-1.5 rounded-full ${n <= grade ? 'bg-teal-600' : 'bg-gray-300'}`}
+          className={`w-1.5 h-1.5 rounded-full ${n <= grade ? 'bg-teal-600' : 'bg-slate-300'}`}
         />
       ))}
     </span>
@@ -27,7 +27,7 @@ function Chips({ text, tone }) {
   return (
     <div className="flex flex-wrap gap-1">
       {items.map((it, i) => (
-        <span key={i} className={`text-xs px-2 py-0.5 rounded-full border ${toneClass}`}>
+        <span key={i} className={`chip ${toneClass}`}>
           {it}
         </span>
       ))}
@@ -35,8 +35,8 @@ function Chips({ text, tone }) {
   );
 }
 
-const input = 'border rounded-md px-3 py-2 w-full text-sm';
-const label = 'block text-xs font-medium text-gray-600 mb-1';
+const input = 'input';
+const label = 'label';
 const EMPTY_FORM = { name: '', source: '', keynotes: '', clinical: '', better: '', worse: '' };
 
 // নতুন/সম্পাদনা ফর্ম (একই ফর্ম দুই জায়গায় ব্যবহৃত)
@@ -50,7 +50,7 @@ function RemedyForm({ initial, onSubmit, onCancel, submitLabel }) {
         e.preventDefault();
         onSubmit(form);
       }}
-      className="space-y-3 bg-gray-50 rounded-lg border p-4"
+      className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-soft"
     >
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
@@ -81,10 +81,10 @@ function RemedyForm({ initial, onSubmit, onCancel, submitLabel }) {
         </div>
       </div>
       <div className="flex gap-2">
-        <button type="submit" className="bg-teal-600 text-white rounded-md px-4 py-2 text-sm hover:bg-teal-700">
+        <button type="submit" className="btn btn-primary">
           {submitLabel}
         </button>
-        <button type="button" onClick={onCancel} className="bg-white border rounded-md px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
+        <button type="button" onClick={onCancel} className="btn btn-ghost">
           বাতিল
         </button>
       </div>
@@ -295,22 +295,22 @@ export default function MateriaMedica() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">ম্যাটেরিয়া মেডিকা</h2>
-          <p className="text-sm text-gray-500">
+          <h2 className="page-title">ম্যাটেরিয়া মেডিকা</h2>
+          <p className="page-sub">
             ওষুধ বেছে নিয়ে তার কী-নোট ও রেপার্টরি প্রোফাইল দেখুন — নিজের বিচারে নতুন ওষুধও যোগ করতে পারবেন।
           </p>
         </div>
         <button
           onClick={() => { setShowAddForm((v) => !v); setNotice(null); }}
-          className="bg-teal-600 text-white rounded-md px-4 py-2 text-sm hover:bg-teal-700"
+          className="btn btn-primary"
         >
           {showAddForm ? '✕ বন্ধ করুন' : '＋ নতুন ওষুধ যোগ করুন'}
         </button>
       </div>
 
-      {msg && <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{msg}</div>}
+      {msg && <div className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">{msg}</div>}
       {notice && (
-        <div className={`text-sm px-3 py-2 rounded ${notice.ok ? 'text-teal-700 bg-teal-50' : 'text-red-600 bg-red-50'}`}>
+        <div className={`text-sm px-3 py-2 rounded-lg border ${notice.ok ? 'text-teal-700 bg-teal-50 border-teal-200' : 'text-red-600 bg-red-50 border-red-200'}`}>
           {notice.text}
         </div>
       )}
@@ -325,22 +325,22 @@ export default function MateriaMedica() {
       )}
 
       <input
-        className="border rounded-md px-3 py-2 w-full max-w-md"
+        className="input max-w-md"
         placeholder="🔍 ওষুধ খুঁজুন (নাম, উৎস বা কী-নোট)..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
 
       {/* বর্ণমালা ইনডেক্স */}
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1 rounded-xl border border-slate-100 bg-slate-50 p-2">
         {['সব', ...letters].map((L) => (
           <button
             key={L}
             onClick={() => setLetter(L)}
-            className={`px-2 py-1 rounded text-xs font-medium border ${
+            className={`px-2.5 py-1 rounded-md text-xs font-medium border transition ${
               letter === L
-                ? 'bg-teal-600 text-white border-teal-600'
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                ? 'bg-teal-600 text-white border-teal-600 shadow-soft'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
             }`}
           >
             {L}
@@ -350,42 +350,42 @@ export default function MateriaMedica() {
 
       <div className="grid md:grid-cols-3 gap-4">
         {/* ওষুধের তালিকা */}
-        <div className="md:col-span-1 bg-white rounded-xl shadow p-2 max-h-[32rem] overflow-auto">
+        <div className="md:col-span-1 card p-2 max-h-[32rem] overflow-auto">
           {filtered.map((r) => (
             <button
               key={r.id}
               onClick={() => openRemedy(r)}
-              className={`w-full text-left px-3 py-2 rounded-lg ${
-                selected?.id === r.id ? 'bg-teal-50' : 'hover:bg-gray-50'
+              className={`w-full text-left px-3 py-2 rounded-lg transition ${
+                selected?.id === r.id ? 'bg-teal-50 ring-1 ring-inset ring-teal-200' : 'hover:bg-slate-50'
               }`}
             >
-              <div className={`font-semibold ${selected?.id === r.id ? 'text-teal-700' : 'text-gray-800'}`}>
+              <div className={`text-sm font-semibold ${selected?.id === r.id ? 'text-teal-700' : 'text-slate-800'}`}>
                 {r.name}
                 {!!r.is_custom && (
-                  <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 align-middle">
+                  <span className="badge ml-2 border-amber-200 bg-amber-50 text-amber-700 align-middle">
                     নিজের যোগ করা
                   </span>
                 )}
               </div>
-              <div className="text-xs text-gray-400 italic">{r.source}</div>
+              <div className="text-xs text-slate-400 italic">{r.source}</div>
             </button>
           ))}
           {filtered.length === 0 && (
-            <div className="text-sm text-gray-400 p-3">কিছু পাওয়া যায়নি।</div>
+            <div className="py-8 text-center text-sm text-slate-400">কিছু পাওয়া যায়নি।</div>
           )}
         </div>
 
         {/* বিস্তারিত প্রোফাইল */}
         <div className="md:col-span-2">
           {!selected && (
-            <div className="bg-white rounded-xl shadow p-6 text-gray-400 text-sm h-full flex items-center justify-center">
+            <div className="card p-6 text-slate-400 text-sm h-full flex items-center justify-center">
               ← বাম পাশ থেকে একটি ওষুধ নির্বাচন করুন
             </div>
           )}
 
           {selected && editing && (
-            <div className="bg-white rounded-xl shadow p-5 space-y-3">
-              <h3 className="text-lg font-bold text-gray-800">সম্পাদনা: {selected.name}</h3>
+            <div className="card p-5 space-y-3">
+              <h3 className="text-lg font-bold text-slate-800">সম্পাদনা: {selected.name}</h3>
               <RemedyForm
                 initial={{
                   name: selected.name,
@@ -403,30 +403,30 @@ export default function MateriaMedica() {
           )}
 
           {selected && !editing && (
-            <div className="bg-white rounded-xl shadow p-5 space-y-4">
+            <div className="card p-5 space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h3 className="text-xl font-bold text-teal-700">
                     {selected.name}
                     {!!selected.is_custom && (
-                      <span className="ml-2 text-xs bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 align-middle">
+                      <span className="badge ml-2 border-amber-200 bg-amber-50 text-amber-700 align-middle">
                         নিজের যোগ করা
                       </span>
                     )}
                   </h3>
-                  <p className="text-sm text-gray-500 italic">উৎস: {selected.source}</p>
+                  <p className="text-sm text-slate-500 italic">উৎস: {selected.source}</p>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => { setEditing(true); setNotice(null); }}
-                    className="text-sm bg-white border rounded-md px-3 py-1.5 text-gray-600 hover:bg-gray-50"
+                    className="btn btn-ghost btn-sm"
                   >
                     ✎ সম্পাদনা
                   </button>
                   {!!selected.is_custom && (
                     <button
                       onClick={removeRemedy}
-                      className="text-sm bg-white border border-red-200 rounded-md px-3 py-1.5 text-red-600 hover:bg-red-50"
+                      className="btn btn-danger btn-sm"
                     >
                       🗑 মুছুন
                     </button>
@@ -434,26 +434,26 @@ export default function MateriaMedica() {
                 </div>
               </div>
 
-              <div className="bg-teal-50 rounded-lg p-3">
-                <div className="text-xs font-semibold text-teal-700 mb-1">কী-নোট</div>
-                <p className="text-sm text-gray-700">{selected.keynotes || '—'}</p>
+              <div className="rounded-lg border border-teal-100 bg-teal-50 p-3">
+                <div className="section-title text-teal-700 mb-1">কী-নোট</div>
+                <p className="text-sm text-slate-700">{selected.keynotes || '—'}</p>
               </div>
 
               {selected.clinical && (
-                <div className="bg-blue-50 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-blue-700 mb-1">ক্লিনিক্যাল ব্যবহার</div>
-                  <p className="text-sm text-gray-700">{selected.clinical}</p>
+                <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+                  <div className="section-title text-blue-700 mb-1">ক্লিনিক্যাল ব্যবহার</div>
+                  <p className="text-sm text-slate-700">{selected.clinical}</p>
                 </div>
               )}
 
               {(selected.better || selected.worse) && (
                 <div className="grid sm:grid-cols-2 gap-3">
-                  <div className="rounded-lg border border-green-200 p-3">
-                    <div className="text-xs font-semibold text-green-700 mb-2">কীতে ভালো (মোডালিটি)</div>
+                  <div className="rounded-lg border border-green-200 bg-green-50/60 p-3">
+                    <div className="section-title text-green-700 mb-2">কীতে ভালো (মোডালিটি)</div>
                     <Chips text={selected.better} tone="good" />
                   </div>
-                  <div className="rounded-lg border border-red-200 p-3">
-                    <div className="text-xs font-semibold text-red-700 mb-2">কীতে বাড়ে (মোডালিটি)</div>
+                  <div className="rounded-lg border border-red-200 bg-red-50/60 p-3">
+                    <div className="section-title text-red-700 mb-2">কীতে বাড়ে (মোডালিটি)</div>
                     <Chips text={selected.worse} tone="bad" />
                   </div>
                 </div>
@@ -461,16 +461,16 @@ export default function MateriaMedica() {
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-gray-800">রেপার্টরি প্রোফাইল</h4>
+                  <h4 className="section-title text-slate-700">রেপার্টরি প্রোফাইল</h4>
                   <div className="flex items-center gap-3">
                     {profile && (
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-slate-400 inline-flex items-center gap-1">
                         {profile.length} রুব্রিকে আছে · গ্রেড <GradeDots grade={3} /> = শক্তিশালী
                       </span>
                     )}
                     <button
                       onClick={() => setShowLinkPicker((v) => !v)}
-                      className="text-xs bg-teal-50 text-teal-700 border border-teal-200 rounded-md px-2 py-1 hover:bg-teal-100"
+                      className="btn btn-sm border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
                     >
                       {showLinkPicker ? '✕ বন্ধ' : '＋ রুব্রিক যোগ'}
                     </button>
@@ -478,7 +478,7 @@ export default function MateriaMedica() {
                 </div>
 
                 {showLinkPicker && (
-                  <div className="bg-gray-50 rounded-lg border p-3 mb-3 grid sm:grid-cols-4 gap-2 items-end">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 mb-3 grid sm:grid-cols-4 gap-2 items-end">
                     <div>
                       <label className={label}>সেকশন</label>
                       <select className={input} value={linkSection} onChange={(e) => onPickSection(e.target.value)}>
@@ -498,7 +498,7 @@ export default function MateriaMedica() {
                       </select>
                     </div>
                     <div className="flex gap-2 items-end">
-                      <div>
+                      <div className="w-20">
                         <label className={label}>গ্রেড</label>
                         <select className={input} value={linkGrade} onChange={(e) => setLinkGrade(e.target.value)}>
                           <option value={1}>১</option>
@@ -509,7 +509,7 @@ export default function MateriaMedica() {
                       <button
                         onClick={addLink}
                         disabled={!linkRubricId}
-                        className="bg-teal-600 text-white rounded-md px-3 py-2 text-sm hover:bg-teal-700 disabled:opacity-50"
+                        className="btn btn-primary btn-sm"
                       >
                         যোগ
                       </button>
@@ -517,10 +517,10 @@ export default function MateriaMedica() {
                   </div>
                 )}
 
-                {loadingProfile && <div className="text-sm text-gray-400">লোড হচ্ছে…</div>}
+                {loadingProfile && <div className="py-2 text-sm text-slate-400">লোড হচ্ছে…</div>}
 
                 {!loadingProfile && grouped.length === 0 && profile && (
-                  <div className="text-sm text-gray-400">
+                  <div className="py-8 text-center text-sm text-slate-400">
                     এই ওষুধটির জন্য কোনো রুব্রিক লিংক নেই — উপরের "＋ রুব্রিক যোগ" থেকে যুক্ত করুন।
                   </div>
                 )}
@@ -528,23 +528,23 @@ export default function MateriaMedica() {
                 <div className="space-y-3">
                   {grouped.map(([section, rows]) => (
                     <div key={section}>
-                      <div className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">
+                      <div className="section-title inline-flex rounded-full bg-slate-100 px-2.5 py-1 mb-1.5">
                         {section}
                       </div>
-                      <ul className="space-y-1">
+                      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100">
                         {rows.map((row, i) => (
                           <li key={i} className="flex items-center gap-1 group">
                             <button
                               onClick={() => focusRubric(row)}
                               title="রেপার্টরিতে এই রুব্রিক দেখুন"
-                              className="flex-1 text-left flex items-center gap-2 text-sm text-gray-700 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700"
+                              className="flex-1 text-left flex items-center gap-2 text-sm text-slate-700 px-2 py-1.5 rounded hover:bg-teal-50 hover:text-teal-700"
                             >
                               <GradeDots grade={row.grade} />
                               <span className="flex-1">{row.rubric_text}</span>
-                              <span className="text-gray-300">↗</span>
+                              <span className="text-slate-300 group-hover:text-teal-400">↗</span>
                             </button>
                             <select
-                              className="text-xs border rounded px-1 py-0.5 text-gray-500 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                              className="text-xs border border-slate-200 rounded px-1 py-0.5 text-slate-500 bg-white opacity-0 group-hover:opacity-100 focus:opacity-100"
                               value={row.grade}
                               title="গ্রেড পরিবর্তন"
                               onChange={(e) => changeGrade(row, e.target.value)}
@@ -556,7 +556,7 @@ export default function MateriaMedica() {
                             <button
                               onClick={() => removeLink(row)}
                               title="এই রুব্রিক লিংক মুছুন"
-                              className="text-xs text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 px-1"
+                              className="text-xs text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 px-1"
                             >
                               ✕
                             </button>

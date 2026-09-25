@@ -2,6 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-slate-100 text-slate-800 antialiased;
+    background-image: radial-gradient(1200px 420px at 50% -120px, rgb(13 148 136 / 0.10), transparent);
+    background-attachment: fixed;
+  }
+  /* সব ইন্টারঅ্যাক্টিভ উপাদানে মসৃণ ট্রানজিশন ও স্পষ্ট ফোকাস-রিং */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    @apply transition-colors duration-150;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-teal-500/50 ring-offset-1;
+  }
+  ::selection {
+    @apply bg-teal-200 text-teal-900;
+  }
+  /* স্ক্রলবার */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-xl border border-slate-100 shadow-soft;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium
+           transition disabled:opacity-50 disabled:cursor-not-allowed select-none;
+  }
+  .btn-primary {
+    @apply btn bg-teal-600 text-white hover:bg-teal-700 shadow-soft;
+  }
+  .btn-ghost {
+    @apply btn bg-white border border-slate-200 text-slate-600 hover:bg-slate-50;
+  }
+  .btn-danger {
+    @apply btn bg-white border border-red-200 text-red-600 hover:bg-red-50;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+  .input {
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm
+           placeholder:text-slate-400 outline-none
+           focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20;
+  }
+  .label {
+    @apply mb-1 block text-xs font-medium text-slate-600;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium;
+  }
+  .page-title {
+    @apply text-2xl font-bold tracking-tight text-slate-800;
+  }
+  .page-sub {
+    @apply text-sm text-slate-500;
+  }
+  .section-title {
+    @apply text-xs font-semibold uppercase tracking-wide text-slate-500;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs;
+  }
 }

@@ -16,6 +16,12 @@ build/
 .env.local
 .env.production
 
+# Firebase (সার্ভিস অ্যাকাউন্ট কী ও ক্যাশ — কখনো কমিট করা যাবে না)
+firebase-key.json
+*serviceAccount*.json
+.firebase/
+firebase-debug.log
+
 # Logs
 *.log
 npm-debug.log*

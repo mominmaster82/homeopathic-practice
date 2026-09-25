@@ -1,10 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api.js';
+import { extraCaseFields } from './caseFields.js';
 
 const potencies = ['6C', '30C', '200C', '1M', '0/1 (LM)', 'Q (মাতৃটিংচার)'];
-const input = 'border rounded-md px-3 py-2 w-full';
-const emptyCase = { symptoms: '', notes: '' };
+const input = 'input';
+const emptyCase = {
+  symptoms: '', notes: '',
+  duration: '', cause: '', aggravation: '', amelioration: '', past_medication: '',
+};
 const emptyRx = { remedy_id: '', potency: '30C', dose: '' };
 
 export default function PatientProfile() {
@@ -37,13 +41,13 @@ export default function PatientProfile() {
   if (msg) {
     return (
       <div className="space-y-4">
-        <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{msg}</div>
-        <Link to="/patients" className="text-teal-700 hover:underline text-sm">← রোগী তালিকায় ফিরে যান</Link>
+        <div className="card border-red-200 bg-red-50 p-4 text-sm text-red-700">{msg}</div>
+        <Link to="/patients" className="text-sm font-medium text-teal-700 hover:text-teal-800 hover:underline">← রোগী তালিকায় ফিরে যান</Link>
       </div>
     );
   }
 
-  if (!p) return <div className="text-sm text-gray-400">লোড হচ্ছে…</div>;
+  if (!p) return <div className="py-8 text-center text-sm text-slate-400">লোড হচ্ছে…</div>;
 
   const caseCount = p.cases.length;
   const rxCount = p.cases.reduce((n, c) => n + c.prescriptions.length, 0);
@@ -85,7 +89,15 @@ export default function PatientProfile() {
   // ---- কেস সম্পাদনা / মুছে ফেলা ----
   const startEditCase = (c) => {
     setEditCaseId(c.id);
-    setEditCaseForm({ symptoms: c.symptoms || '', notes: c.notes || '' });
+    setEditCaseForm({
+      symptoms: c.symptoms || '',
+      notes: c.notes || '',
+      duration: c.duration || '',
+      cause: c.cause || '',
+      aggravation: c.aggravation || '',
+      amelioration: c.amelioration || '',
+      past_medication: c.past_medication || '',
+    });
     setNotice('');
   };
 
@@ -202,50 +214,57 @@ export default function PatientProfile() {
   return (
     <div className="space-y-6">
       {/* শিরোনাম + কাজ */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link to="/patients" className="text-sm text-teal-700 hover:underline">← রোগী তালিকা</Link>
-          <h2 className="text-2xl font-bold text-gray-800">{p.name}</h2>
-          <p className="text-sm text-gray-500">
-            {[p.age ? `বয়স: ${p.age}` : null, p.gender ? `লিঙ্গ: ${p.gender}` : null, p.phone ? `ফোন: ${p.phone}` : null]
-              .filter(Boolean).join(' · ') || 'কোনো অতিরিক্ত তথ্য নেই'}
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5">যোগ হয়েছে: {p.created_at}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={toggleCaseForm}
-            className="px-4 py-2 rounded-md bg-teal-600 text-white hover:bg-teal-700"
-          >
-            {showCaseForm ? 'কেস ফর্ম বন্ধ করুন' : '+ নতুন কেস'}
-          </button>
-          <button
-            onClick={() => navigate('/patients')}
-            className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300"
-          >
-            সম্পাদনা
-          </button>
-          <button
-            onClick={onDelete}
-            className="px-4 py-2 rounded-md bg-red-100 text-red-700 hover:bg-red-200"
-          >
-            মুছুন
-          </button>
+      <div className="card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-teal-700 text-xl font-bold text-white shadow-soft">
+              {p.name?.trim()?.charAt(0) || '—'}
+            </div>
+            <div>
+              <Link to="/patients" className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline">← রোগী তালিকা</Link>
+              <h2 className="page-title mt-0.5">{p.name}</h2>
+              <p className="page-sub mt-0.5">
+                {[p.age ? `বয়স: ${p.age}` : null, p.gender ? `লিঙ্গ: ${p.gender}` : null, p.phone ? `ফোন: ${p.phone}` : null]
+                  .filter(Boolean).join(' · ') || 'কোনো অতিরিক্ত তথ্য নেই'}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">যোগ হয়েছে: {p.created_at}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={toggleCaseForm}
+              className={showCaseForm ? 'btn btn-ghost' : 'btn btn-primary'}
+            >
+              {showCaseForm ? 'কেস ফর্ম বন্ধ করুন' : '+ নতুন কেস'}
+            </button>
+            <button
+              onClick={() => navigate('/patients')}
+              className="btn btn-ghost"
+            >
+              সম্পাদনা
+            </button>
+            <button
+              onClick={onDelete}
+              className="btn btn-danger"
+            >
+              মুছুন
+            </button>
+          </div>
         </div>
       </div>
 
       {/* নন-ফ্যাটাল বার্তা */}
       {notice && (
-        <div className="text-sm text-teal-700 bg-teal-50 px-3 py-2 rounded flex justify-between">
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-medium text-teal-800 shadow-soft">
           <span>{notice}</span>
-          <button onClick={() => setNotice('')} className="text-teal-500 hover:text-teal-800">✕</button>
+          <button onClick={() => setNotice('')} className="rounded-full p-0.5 text-teal-500 hover:bg-teal-100 hover:text-teal-800">✕</button>
         </div>
       )}
 
       {/* ইনলাইন নতুন কেস ফর্ম */}
       {showCaseForm && (
-        <form onSubmit={submitCase} className="bg-white p-4 rounded-xl shadow space-y-3">
-          <div className="font-medium text-gray-700">নতুন কেস</div>
+        <form onSubmit={submitCase} className="card space-y-3 border-amber-200 p-5">
+          <div className="section-title">নতুন কেস</div>
           <textarea
             className={input}
             name="symptoms"
@@ -254,6 +273,29 @@ export default function PatientProfile() {
             value={caseForm.symptoms}
             onChange={(e) => setCaseForm({ ...caseForm, symptoms: e.target.value })}
           />
+          {extraCaseFields.map((f) => (
+            f.type === 'input' ? (
+              <input
+                key={f.name}
+                className={input}
+                type="text"
+                name={f.name}
+                placeholder={f.placeholder}
+                value={caseForm[f.name]}
+                onChange={(e) => setCaseForm({ ...caseForm, [f.name]: e.target.value })}
+              />
+            ) : (
+              <textarea
+                key={f.name}
+                className={input}
+                name={f.name}
+                rows="2"
+                placeholder={f.placeholder}
+                value={caseForm[f.name]}
+                onChange={(e) => setCaseForm({ ...caseForm, [f.name]: e.target.value })}
+              />
+            )
+          ))}
           <textarea
             className={input}
             name="notes"
@@ -262,17 +304,17 @@ export default function PatientProfile() {
             value={caseForm.notes}
             onChange={(e) => setCaseForm({ ...caseForm, notes: e.target.value })}
           />
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <button
               disabled={busy}
-              className="bg-teal-600 text-white rounded-md px-4 py-2 hover:bg-teal-700 disabled:opacity-50"
+              className="btn btn-primary"
             >
               {busy ? 'সংরক্ষণ হচ্ছে…' : 'কেস সংরক্ষণ করো'}
             </button>
             <button
               type="button"
               onClick={toggleCaseForm}
-              className="rounded-md px-4 py-2 bg-gray-200 hover:bg-gray-300"
+              className="btn btn-ghost"
             >
               বাতিল
             </button>
@@ -281,18 +323,18 @@ export default function PatientProfile() {
       )}
 
       {/* পরিসংখ্যান */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl shadow p-4">
-          <div className="text-3xl font-bold text-teal-700">{caseCount}</div>
-          <div className="text-sm text-gray-500">কেস</div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="card p-5 transition hover:shadow-card">
+          <div className="text-3xl font-bold tracking-tight text-teal-700">{caseCount}</div>
+          <div className="mt-1 text-sm text-slate-500">কেস</div>
         </div>
-        <div className="bg-white rounded-xl shadow p-4">
-          <div className="text-3xl font-bold text-amber-600">{rxCount}</div>
-          <div className="text-sm text-gray-500">প্রেসক্রিপশন</div>
+        <div className="card p-5 transition hover:shadow-card">
+          <div className="text-3xl font-bold tracking-tight text-amber-600">{rxCount}</div>
+          <div className="mt-1 text-sm text-slate-500">প্রেসক্রিপশন</div>
         </div>
-        <div className="bg-white rounded-xl shadow p-4 col-span-2 sm:col-span-1">
-          <div className="text-sm text-gray-500">সর্বশেষ সাক্ষাৎ</div>
-          <div className="text-lg font-semibold text-gray-700">
+        <div className="card col-span-2 p-5 transition hover:shadow-card sm:col-span-1">
+          <div className="text-sm text-slate-500">সর্বশেষ সাক্ষাৎ</div>
+          <div className="mt-1 text-lg font-semibold text-slate-800">
             {caseCount ? p.cases[0].date : '—'}
           </div>
         </div>
@@ -300,36 +342,41 @@ export default function PatientProfile() {
 
       {/* টাইমলাইন */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-700 mb-3">কেস টাইমলাইন</h3>
+        <h3 className="section-title mb-3">কেস টাইমলাইন</h3>
 
         {caseCount === 0 && (
-          <div className="bg-white rounded-xl shadow p-6 text-sm text-gray-400">
+          <div className="card py-8 text-center text-sm text-slate-400">
             এই রোগীর এখনো কোনো কেস নেই।
           </div>
         )}
 
         {caseCount > 0 && (
-          <ol className="relative border-l-2 border-teal-200 ml-2 space-y-5">
+          <ol className="relative ml-2 space-y-5 border-l-2 border-teal-200">
             {p.cases.map((c) => (
               <li key={c.id} className="ml-5">
-                <span className="absolute -left-[9px] mt-1.5 w-4 h-4 rounded-full bg-teal-500 border-2 border-white" />
-                <div className="bg-white rounded-xl shadow p-4 space-y-3">
+                <span className="absolute -left-[9px] mt-1.5 h-4 w-4 rounded-full border-2 border-white bg-teal-500 shadow-soft" />
+                <div className="card space-y-4 p-5 transition hover:shadow-card">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="font-semibold text-gray-700">কেস #{c.id}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-800">কেস #{c.id}</span>
+                      {editCaseId === c.id && (
+                        <span className="badge border-amber-200 bg-amber-50 text-amber-700">✎</span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-xs text-gray-400">{c.date}</span>
-                      <Link to={`/print/${c.id}`} className="text-xs text-teal-700 hover:underline">
+                      <span className="text-xs text-slate-400">{c.date}</span>
+                      <Link to={`/print/${c.id}`} className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline">
                         🖨 প্রিন্ট / PDF
                       </Link>
                       <button
                         onClick={() => (editCaseId === c.id ? cancelEditCase() : startEditCase(c))}
-                        className="text-xs text-teal-700 hover:underline"
+                        className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
                       >
                         {editCaseId === c.id ? 'বাতিল' : 'সম্পাদনা'}
                       </button>
                       <button
                         onClick={() => onDeleteCase(c)}
-                        className="text-xs text-red-600 hover:underline"
+                        className="text-xs font-medium text-red-600 hover:text-red-700 hover:underline"
                       >
                         মুছুন
                       </button>
@@ -337,7 +384,7 @@ export default function PatientProfile() {
                   </div>
 
                   {editCaseId === c.id ? (
-                    <form onSubmit={(e) => submitEditCase(e, c.id)} className="space-y-2">
+                    <form onSubmit={(e) => submitEditCase(e, c.id)} className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
                       <textarea
                         className={input}
                         placeholder="লক্ষণ *"
@@ -345,6 +392,27 @@ export default function PatientProfile() {
                         value={editCaseForm.symptoms}
                         onChange={(e) => setEditCaseForm({ ...editCaseForm, symptoms: e.target.value })}
                       />
+                      {extraCaseFields.map((f) => (
+                        f.type === 'input' ? (
+                          <input
+                            key={f.name}
+                            className={input}
+                            type="text"
+                            placeholder={f.placeholder}
+                            value={editCaseForm[f.name]}
+                            onChange={(e) => setEditCaseForm({ ...editCaseForm, [f.name]: e.target.value })}
+                          />
+                        ) : (
+                          <textarea
+                            key={f.name}
+                            className={input}
+                            rows="2"
+                            placeholder={f.placeholder}
+                            value={editCaseForm[f.name]}
+                            onChange={(e) => setEditCaseForm({ ...editCaseForm, [f.name]: e.target.value })}
+                          />
+                        )
+                      ))}
                       <textarea
                         className={input}
                         placeholder="নোট / পর্যবেক্ষণ"
@@ -354,54 +422,57 @@ export default function PatientProfile() {
                       />
                       <button
                         disabled={busy}
-                        className="bg-teal-600 text-white rounded-md px-4 py-2 hover:bg-teal-700 disabled:opacity-50"
+                        className="btn btn-primary btn-sm"
                       >
                         {busy ? 'সংরক্ষণ হচ্ছে…' : 'হালনাগাদ করো'}
                       </button>
                     </form>
                   ) : (
-                    <>
-                      {c.symptoms && <div className="text-sm"><b>লক্ষণ:</b> {c.symptoms}</div>}
-                      {c.notes && <div className="text-sm"><b>নোট:</b> {c.notes}</div>}
-                    </>
+                    <div className="space-y-2 rounded-lg bg-slate-50 p-3">
+                      {c.symptoms && <div className="text-sm text-slate-700"><b className="font-semibold text-slate-800">লক্ষণ:</b> {c.symptoms}</div>}
+                      {extraCaseFields.map((f) => c[f.name] && (
+                        <div key={f.name} className="text-sm text-slate-700"><b className="font-semibold text-slate-800">{f.label}:</b> {c[f.name]}</div>
+                      ))}
+                      {c.notes && <div className="text-sm text-slate-700"><b className="font-semibold text-slate-800">নোট:</b> {c.notes}</div>}
+                    </div>
                   )}
 
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="text-sm font-medium text-gray-600">প্রেসক্রিপশন</div>
+                  <div className="border-t border-slate-100 pt-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="section-title">প্রেসক্রিপশন</div>
                       <button
                         onClick={() => toggleRx(c.id)}
-                        className="text-xs text-teal-700 hover:underline"
+                        className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
                       >
                         {rxForCase === c.id ? 'বাতিল' : '+ প্রেসক্রিপশন'}
                       </button>
                     </div>
 
                     {c.prescriptions.length === 0 ? (
-                      <div className="text-xs text-gray-400">কোনো ওষুধ যোগ করা হয়নি।</div>
+                      <div className="py-8 text-center text-sm text-slate-400">কোনো ওষুধ যোগ করা হয়নি।</div>
                     ) : (
                       <ul className="flex flex-wrap gap-2">
                         {c.prescriptions.map((rx) => (
                           <li
                             key={rx.id}
-                            className="text-sm bg-amber-50 border border-amber-200 rounded-md px-2 py-1 flex items-center gap-2"
+                            className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-sm shadow-soft transition hover:border-amber-300"
                           >
                             <span>
-                              <b className="text-amber-800">{rx.remedy_name}</b>
-                              {rx.potency && <span className="text-gray-500"> · {rx.potency}</span>}
-                              {rx.dose && <span className="text-gray-500"> · {rx.dose}</span>}
+                              <b className="font-semibold text-amber-800">{rx.remedy_name}</b>
+                              {rx.potency && <span className="text-slate-500"> · {rx.potency}</span>}
+                              {rx.dose && <span className="text-slate-500"> · {rx.dose}</span>}
                             </span>
                             <button
                               onClick={() => startEditRx(c.id, rx)}
                               title="সম্পাদনা"
-                              className="text-amber-600 hover:text-amber-800"
+                              className="rounded p-0.5 text-amber-600 hover:bg-amber-100 hover:text-amber-800"
                             >
                               ✎
                             </button>
                             <button
                               onClick={() => onDeleteRx(c.id, rx)}
                               title="মুছুন"
-                              className="text-red-500 hover:text-red-700"
+                              className="rounded p-0.5 text-red-500 hover:bg-red-100 hover:text-red-700"
                             >
                               ✕
                             </button>
@@ -413,9 +484,9 @@ export default function PatientProfile() {
                     {rxForCase === c.id && (
                       <form
                         onSubmit={(e) => submitRx(e, c.id)}
-                        className="mt-3 p-3 bg-gray-50 rounded-lg border space-y-2"
+                        className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3"
                       >
-                        <div className="grid sm:grid-cols-3 gap-2">
+                        <div className="grid gap-2 sm:grid-cols-2">
                           <select
                             className={input}
                             value={rxForm.remedy_id}
@@ -435,16 +506,17 @@ export default function PatientProfile() {
                               <option key={pt} value={pt}>{pt}</option>
                             ))}
                           </select>
-                          <input
-                            className={input}
-                            placeholder="মাত্রা (যেমন: ৪ ডোজ)"
-                            value={rxForm.dose}
-                            onChange={(e) => setRxForm({ ...rxForm, dose: e.target.value })}
-                          />
                         </div>
+                        <textarea
+                          className={input}
+                          rows="2"
+                          placeholder="সেবনবিধি বিস্তারিত লিখুন যাতে সাধারণ মানুষও বোঝে — যেমন: সকালে ও রাতে খালি পেটে ২টি করে পিল, ৭ দিন খাবেন"
+                          value={rxForm.dose}
+                          onChange={(e) => setRxForm({ ...rxForm, dose: e.target.value })}
+                        />
                         <button
                           disabled={busy}
-                          className="bg-amber-600 text-white rounded-md px-4 py-2 hover:bg-amber-700 disabled:opacity-50"
+                          className="btn bg-amber-600 text-white shadow-soft hover:bg-amber-700"
                         >
                           {busy ? 'যোগ হচ্ছে…' : 'ওষুধ যোগ করো'}
                         </button>
@@ -454,10 +526,10 @@ export default function PatientProfile() {
                     {editRx?.caseId === c.id && (
                       <form
                         onSubmit={submitEditRx}
-                        className="mt-3 p-3 bg-gray-50 rounded-lg border space-y-2"
+                        className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3"
                       >
-                        <div className="text-xs text-gray-500">প্রেসক্রিপশন সম্পাদনা</div>
-                        <div className="grid sm:grid-cols-3 gap-2">
+                        <div className="text-xs font-medium text-slate-500">প্রেসক্রিপশন সম্পাদনা</div>
+                        <div className="grid gap-2 sm:grid-cols-2">
                           <select
                             className={input}
                             value={editRxForm.remedy_id}
@@ -477,24 +549,25 @@ export default function PatientProfile() {
                               <option key={pt} value={pt}>{pt}</option>
                             ))}
                           </select>
-                          <input
-                            className={input}
-                            placeholder="মাত্রা"
-                            value={editRxForm.dose}
-                            onChange={(e) => setEditRxForm({ ...editRxForm, dose: e.target.value })}
-                          />
                         </div>
+                        <textarea
+                          className={input}
+                          rows="2"
+                          placeholder="সেবনবিধি বিস্তারিত লিখুন যাতে সাধারণ মানুষও বোঝে — যেমন: সকালে ও রাতে খালি পেটে ২টি করে পিল, ৭ দিন খাবেন"
+                          value={editRxForm.dose}
+                          onChange={(e) => setEditRxForm({ ...editRxForm, dose: e.target.value })}
+                        />
                         <div className="flex gap-2">
                           <button
                             disabled={busy}
-                            className="bg-teal-600 text-white rounded-md px-4 py-2 hover:bg-teal-700 disabled:opacity-50"
+                            className="btn btn-primary btn-sm"
                           >
                             {busy ? 'সংরক্ষণ হচ্ছে…' : 'হালনাগাদ করো'}
                           </button>
                           <button
                             type="button"
                             onClick={cancelEditRx}
-                            className="rounded-md px-4 py-2 bg-gray-200 hover:bg-gray-300"
+                            className="btn btn-ghost btn-sm"
                           >
                             বাতিল
                           </button>

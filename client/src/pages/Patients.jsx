@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { api } from '../services/api.js';
 
 const empty = { name: '', age: '', gender: '', phone: '' };
-const input = 'border rounded-md px-3 py-2 w-full';
 
 export default function Patients() {
   const [patients, setPatients] = useState([]);
@@ -64,82 +63,133 @@ export default function Patients() {
   };
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">রোগী ব্যবস্থাপনা</h2>
+    <div className="space-y-5">
+      <div>
+        <h2 className="page-title">রোগী ব্যবস্থাপনা</h2>
+        <p className="page-sub">রোগী যোগ, সম্পাদনা ও খোঁজা — সব এক জায়গায়।</p>
+      </div>
 
       {msg && (
-        <div className="text-sm text-teal-700 bg-teal-50 px-3 py-2 rounded flex justify-between">
+        <div className="flex items-center justify-between rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-sm text-teal-700">
           <span>{msg}</span>
-          <button onClick={() => setMsg('')} className="text-teal-500 hover:text-teal-800">✕</button>
+          <button onClick={() => setMsg('')} className="text-teal-500 hover:text-teal-800" title="বন্ধ করুন">
+            ✕
+          </button>
         </div>
       )}
 
-      <form onSubmit={onSubmit} className="bg-white p-4 rounded-xl shadow space-y-3">
-        <div className="font-medium text-gray-700">
-          {editingId ? 'রোগী সম্পাদনা' : 'নতুন রোগী যোগ করুন'}
+      <form onSubmit={onSubmit} className="card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-slate-800">
+            {editingId ? 'রোগী সম্পাদনা' : 'নতুন রোগী যোগ করুন'}
+          </h3>
+          {editingId && (
+            <span className="badge border-amber-200 bg-amber-50 text-amber-700">সম্পাদনা মোড</span>
+          )}
         </div>
         <div className="grid md:grid-cols-4 gap-3">
-          <input className={input} name="name" placeholder="নাম *" value={form.name} onChange={onChange} required />
-          <input className={input} name="age" type="number" placeholder="বয়স" value={form.age} onChange={onChange} />
-          <input className={input} name="gender" placeholder="লিঙ্গ" value={form.gender} onChange={onChange} />
-          <input className={input} name="phone" placeholder="ফোন" value={form.phone} onChange={onChange} />
+          <div>
+            <label className="label">নাম *</label>
+            <input className="input" name="name" placeholder="রোগীর নাম" value={form.name} onChange={onChange} required />
+          </div>
+          <div>
+            <label className="label">বয়স</label>
+            <input className="input" name="age" type="number" placeholder="বছর" value={form.age} onChange={onChange} />
+          </div>
+          <div>
+            <label className="label">লিঙ্গ</label>
+            <select className="input" name="gender" value={form.gender} onChange={onChange}>
+              <option value="">— লিঙ্গ নির্বাচন —</option>
+              {form.gender && !['পুরুষ', 'মহিলা', 'অন্যান্য'].includes(form.gender) && (
+                <option value={form.gender}>{form.gender}</option>
+              )}
+              <option value="পুরুষ">পুরুষ</option>
+              <option value="মহিলা">মহিলা</option>
+              <option value="অন্যান্য">অন্যান্য</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">ফোন</label>
+            <input className="input" name="phone" placeholder="মোবাইল নম্বর" value={form.phone} onChange={onChange} />
+          </div>
         </div>
         <div className="flex gap-2">
-          <button className="bg-teal-600 text-white rounded-md px-4 py-2 hover:bg-teal-700">
-            {editingId ? 'হালনাগাদ করো' : 'যোগ করো'}
+          <button type="submit" className="btn btn-primary">
+            {editingId ? 'হালনাগাদ করো' : '＋ যোগ করো'}
           </button>
           {editingId && (
-            <button type="button" onClick={resetForm} className="rounded-md px-4 py-2 bg-gray-200 hover:bg-gray-300">
+            <button type="button" onClick={resetForm} className="btn btn-ghost">
               বাতিল
             </button>
           )}
         </div>
       </form>
 
-      <div>
+      <div className="flex items-center justify-between gap-3">
         <input
-          className={input + ' max-w-sm'}
+          className="input max-w-sm"
           placeholder="🔍 নাম বা ফোন দিয়ে খুঁজুন..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+        <span className="text-xs text-slate-400">{patients.length} জন রোগী</span>
       </div>
 
-      <div className="bg-white rounded-xl shadow overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-100 text-left">
-            <tr>
-              <th className="p-3">নাম</th>
-              <th className="p-3">বয়স</th>
-              <th className="p-3">লিঙ্গ</th>
-              <th className="p-3">ফোন</th>
-              <th className="p-3">যোগ হয়েছে</th>
-              <th className="p-3 text-right">কাজ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {patients.map((p) => (
-              <tr key={p.id} className="border-t">
-                <td className="p-3 font-medium">
-                  <Link to={`/patients/${p.id}`} className="text-teal-700 hover:underline">
-                    {p.name}
-                  </Link>
-                </td>
-                <td className="p-3">{p.age}</td>
-                <td className="p-3">{p.gender}</td>
-                <td className="p-3">{p.phone}</td>
-                <td className="p-3 text-gray-500">{p.created_at}</td>
-                <td className="p-3 text-right whitespace-nowrap">
-                  <button onClick={() => startEdit(p)} className="text-teal-600 hover:underline mr-3">সম্পাদনা</button>
-                  <button onClick={() => onDelete(p)} className="text-red-600 hover:underline">মুছুন</button>
-                </td>
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-3 font-semibold">নাম</th>
+                <th className="px-4 py-3 font-semibold">বয়স</th>
+                <th className="px-4 py-3 font-semibold">লিঙ্গ</th>
+                <th className="px-4 py-3 font-semibold">ফোন</th>
+                <th className="px-4 py-3 font-semibold">যোগ হয়েছে</th>
+                <th className="px-4 py-3 font-semibold text-right">কাজ</th>
               </tr>
-            ))}
-            {patients.length === 0 && (
-              <tr><td className="p-4 text-gray-500" colSpan={6}>কোনো রোগী পাওয়া যায়নি।</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {patients.map((p) => (
+                <tr key={p.id} className="hover:bg-slate-50/60">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-teal-50 text-teal-700 text-xs font-semibold">
+                        {(p.name || '?').trim().charAt(0)}
+                      </span>
+                      <div className="min-w-0">
+                        <Link to={`/patients/${p.id}`} className="font-medium text-slate-800 hover:text-teal-700 hover:underline">
+                          {p.name}
+                        </Link>
+                        <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500" title="রোগীর সিরিয়াল নং">
+                          #{p.id}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{p.age || '—'}</td>
+                  <td className="px-4 py-3 text-slate-600">{p.gender || '—'}</td>
+                  <td className="px-4 py-3 text-slate-600">{p.phone || '—'}</td>
+                  <td className="px-4 py-3 text-slate-400">{p.created_at}</td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <button onClick={() => startEdit(p)} className="text-xs font-medium text-teal-600 hover:underline mr-3">
+                      সম্পাদনা
+                    </button>
+                    <button onClick={() => onDelete(p)} className="text-xs font-medium text-red-600 hover:underline">
+                      মুছুন
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {patients.length === 0 && (
+                <tr>
+                  <td className="px-4 py-10 text-center text-slate-400" colSpan={6}>
+                    কোনো রোগী পাওয়া যায়নি।
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api.js';
+import { extraCaseFields } from './caseFields.js';
 
 export default function PrescriptionPrint() {
   const { caseId } = useParams();
@@ -26,7 +27,7 @@ export default function PrescriptionPrint() {
   if (msg) {
     return (
       <div className="space-y-4">
-        <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{msg}</div>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-600">{msg}</div>
         <button onClick={() => navigate('/case')} className="text-teal-700 hover:underline text-sm">
           ← কেস পেজে ফিরে যান
         </button>
@@ -35,7 +36,7 @@ export default function PrescriptionPrint() {
   }
 
   if (!caseData || !patient) {
-    return <div className="text-sm text-gray-400">লোড হচ্ছে…</div>;
+    return <div className="py-8 text-center text-sm text-slate-400">লোড হচ্ছে…</div>;
   }
 
   return (
@@ -44,20 +45,20 @@ export default function PrescriptionPrint() {
       <div className="flex gap-2 print:hidden">
         <button
           onClick={() => window.print()}
-          className="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700"
+          className="btn btn-primary"
         >
           🖨 প্রিন্ট / PDF সেভ
         </button>
         <button
           onClick={() => navigate('/case')}
-          className="bg-gray-200 px-4 py-2 rounded-md hover:bg-gray-300"
+          className="btn btn-ghost"
         >
           ← ফিরে যান
         </button>
       </div>
 
       {/* প্রিন্ট-বান্ধব রিসিট */}
-      <div className="bg-white max-w-2xl mx-auto p-8 rounded-xl shadow print:shadow-none print:rounded-none">
+      <div className="card max-w-2xl mx-auto p-8 print:max-w-none print:p-0 print:bg-white print:shadow-none print:rounded-none print:border-0">
         <div className="flex items-center justify-center gap-4 border-b-2 border-teal-600 pb-3 mb-4">
           {settings.logo && (
             <img src={settings.logo} alt="লোগো" className="w-16 h-16 object-contain" />
@@ -67,10 +68,10 @@ export default function PrescriptionPrint() {
               {settings.clinic_name || '🌿 হোমিওপ্যাথি ক্লিনিক'}
             </h2>
             {settings.doctor_name && (
-              <p className="text-sm font-medium text-gray-700">{settings.doctor_name}</p>
+              <p className="text-sm font-medium text-slate-700">{settings.doctor_name}</p>
             )}
             {(settings.address || settings.phone || settings.email) && (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-slate-500">
                 {[settings.address, settings.phone, settings.email].filter(Boolean).join(' · ')}
               </p>
             )}
@@ -95,53 +96,56 @@ export default function PrescriptionPrint() {
           </div>
         </div>
 
-        {caseData.symptoms && (
-          <div className="text-sm mb-4 bg-gray-50 rounded p-2">
-            <b>লক্ষণ:</b> {caseData.symptoms}
+        {(caseData.symptoms || extraCaseFields.some((f) => caseData[f.name])) && (
+          <div className="text-sm mb-4 bg-slate-50 print:bg-transparent rounded border border-slate-200 print:border-slate-300 p-2.5 leading-relaxed space-y-1">
+            {caseData.symptoms && <div><b>লক্ষণ:</b> {caseData.symptoms}</div>}
+            {extraCaseFields.map((f) => caseData[f.name] && (
+              <div key={f.name}><b>{f.label}:</b> {caseData[f.name]}</div>
+            ))}
           </div>
         )}
 
         <table className="w-full text-sm border-collapse mb-4">
           <thead>
-            <tr className="border-b-2 border-gray-300 text-left">
-              <th className="py-1 pr-2 w-8">ক্রম</th>
-              <th className="py-1 pr-2">ওষুধ</th>
-              <th className="py-1 pr-2">শক্তি</th>
-              <th className="py-1">মাত্রা</th>
+            <tr className="border-b-2 border-slate-400 text-left">
+              <th className="py-1.5 pr-2 w-8">ক্রম</th>
+              <th className="py-1.5 pr-2 print:hidden">ওষুধ</th>
+              <th className="py-1.5 pr-2 print:hidden">শক্তি</th>
+              <th className="py-1.5">সেবনবিধি (কীভাবে খাবেন)</th>
             </tr>
           </thead>
           <tbody>
             {caseData.prescriptions.map((p, i) => (
-              <tr key={p.id} className="border-b border-gray-200">
-                <td className="py-1.5 pr-2">{i + 1}.</td>
-                <td className="py-1.5 pr-2 font-semibold">{p.remedy_name}</td>
-                <td className="py-1.5 pr-2">{p.potency || '—'}</td>
-                <td className="py-1.5">{p.dose || '—'}</td>
+              <tr key={p.id} className="border-b border-slate-200">
+                <td className="py-1.5 pr-2 align-top">{i + 1}.</td>
+                <td className="py-1.5 pr-2 font-semibold print:hidden">{p.remedy_name}</td>
+                <td className="py-1.5 pr-2 print:hidden">{p.potency || '—'}</td>
+                <td className="py-1.5 whitespace-pre-line leading-relaxed">{p.dose || '—'}</td>
               </tr>
             ))}
             {caseData.prescriptions.length === 0 && (
               <tr>
-                <td colSpan={4} className="py-2 text-gray-400">কোনো ওষুধ যোগ করা হয়নি।</td>
+                <td colSpan={4} className="py-3 text-center text-slate-400">কোনো ওষুধ যোগ করা হয়নি।</td>
               </tr>
             )}
           </tbody>
         </table>
 
         {caseData.notes && (
-          <div className="text-sm mb-6">
+          <div className="text-sm mb-6 leading-relaxed">
             <b>নোট:</b> {caseData.notes}
           </div>
         )}
 
         {settings.footer_note && (
-          <div className="text-xs text-gray-500 italic border-t border-dashed border-gray-300 pt-2 mb-4">
+          <div className="text-xs text-slate-500 italic border-t border-dashed border-slate-300 pt-2 mb-4">
             {settings.footer_note}
           </div>
         )}
 
-        <div className="mt-10 flex justify-end">
+        <div className="mt-12 flex justify-end">
           <div className="text-center text-sm">
-            <div className="border-t border-gray-400 pt-1 w-40">
+            <div className="border-t border-slate-400 pt-1 w-40">
               {settings.doctor_name ? `স্বাক্ষর · ${settings.doctor_name}` : 'স্বাক্ষর (চিকিৎসক)'}
             </div>
           </div>

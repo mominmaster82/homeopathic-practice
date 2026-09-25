@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api.js';
 
-const input = 'border rounded-md px-3 py-2 w-full';
-const label = 'block text-sm font-medium text-gray-600 mb-1';
+const input = 'input';
+const label = 'label';
 
 const EMPTY = {
   clinic_name: '',
@@ -135,36 +135,38 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5 max-w-2xl">
       <div>
-        <h2 className="text-2xl font-bold text-gray-800">সেটিংস</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="page-title">সেটিংস</h2>
+        <p className="page-sub">
           এখানে ক্লিনিকের পরিচয় দিন — প্রেসক্রিপশন প্রিন্ট/রিসিটের উপরে এগুলো দেখাবে।
         </p>
       </div>
 
       {msg && (
-        <div className={`text-sm px-3 py-2 rounded ${ok ? 'text-teal-700 bg-teal-50' : 'text-red-600 bg-red-50'}`}>
+        <div className={`text-sm px-4 py-2.5 rounded-lg border ${ok ? 'text-teal-700 bg-teal-50 border-teal-200' : 'text-red-700 bg-red-50 border-red-200'}`}>
           {msg}
         </div>
       )}
 
-      <form onSubmit={save} className="bg-white rounded-xl shadow p-5 space-y-4 max-w-2xl">
+      <form onSubmit={save} className="card p-5 space-y-4">
+        <h3 className="section-title">ক্লিনিকের পরিচয়</h3>
+
         {/* লোগো */}
         <div>
           <span className={label}>লোগো</span>
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-lg border flex items-center justify-center overflow-hidden bg-gray-50">
+            <div className="w-20 h-20 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden bg-slate-50 shrink-0">
               {form.logo
                 ? <img src={form.logo} alt="লোগো" className="w-full h-full object-contain" />
-                : <span className="text-xs text-gray-400">কোনো লোগো নেই</span>}
+                : <span className="text-xs text-slate-400 px-1 text-center">কোনো লোগো নেই</span>}
             </div>
             <div className="space-y-2">
               <input
                 type="file"
                 accept="image/*"
                 onChange={onLogo}
-                className="text-sm text-gray-600 file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0 file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"
+                className="text-sm text-slate-600 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-teal-50 file:text-teal-700 file:text-sm file:font-medium hover:file:bg-teal-100 file:cursor-pointer"
               />
               {form.logo && (
                 <button
@@ -211,23 +213,23 @@ export default function Settings() {
         <button
           type="submit"
           disabled={saving}
-          className="bg-teal-600 text-white rounded-md px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
+          className="btn btn-primary"
         >
           {saving ? 'সংরক্ষণ হচ্ছে…' : 'সংরক্ষণ করো'}
         </button>
       </form>
 
       {/* ব্যাকআপ সেকশন */}
-      <div className="bg-white rounded-xl shadow p-5 space-y-4 max-w-2xl">
+      <div className="card p-5 space-y-4">
         <div>
-          <h3 className="text-lg font-bold text-gray-800">ডেটা ব্যাকআপ</h3>
-          <p className="text-sm text-gray-500">
+          <h3 className="section-title">ডেটা ব্যাকআপ</h3>
+          <p className="text-sm text-slate-500 mt-1">
             সব রোগী, কেস, প্রেসক্রিপশন ও সেটিংস JSON ফাইলে সংরক্ষণ করুন বা পূর্বে সংরক্ষিত ব্যাকআপ ফিরিয়ে আনুন।
           </p>
         </div>
 
         {backupMsg && (
-          <div className={`text-sm px-3 py-2 rounded ${backupOk ? 'text-teal-700 bg-teal-50' : 'text-red-600 bg-red-50'}`}>
+          <div className={`text-sm px-4 py-2.5 rounded-lg border ${backupOk ? 'text-teal-700 bg-teal-50 border-teal-200' : 'text-red-700 bg-red-50 border-red-200'}`}>
             {backupMsg}
           </div>
         )}
@@ -237,12 +239,12 @@ export default function Settings() {
             type="button"
             onClick={downloadBackup}
             disabled={backupBusy}
-            className="bg-amber-600 text-white rounded-md px-4 py-2 hover:bg-amber-700 disabled:opacity-50"
+            className="btn btn-primary"
           >
             {backupBusy ? 'প্রস্তুত হচ্ছে…' : '⬇ ব্যাকআপ ডাউনলোড'}
           </button>
 
-          <label className="bg-teal-600 text-white rounded-md px-4 py-2 hover:bg-teal-700 cursor-pointer disabled:opacity-50 inline-flex items-center">
+          <label className="btn btn-ghost cursor-pointer">
             {backupBusy ? 'প্রস্তুত হচ্ছে…' : '⬆ ব্যাকআপ রিস্টোর'}
             <input
               type="file"
@@ -254,22 +256,22 @@ export default function Settings() {
           </label>
         </div>
 
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-slate-400 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700">
           💡 নিয়মিত ব্যাকআপ নিন। রিস্টোর করলে বর্তমান সব ডেটা মুছে যাবে এবং ব্যাকআপের ডেটা বসবে।
         </p>
       </div>
 
       {/* পাসওয়ার্ড পরিবর্তন সেকশন */}
-      <form onSubmit={changePassword} className="bg-white rounded-xl shadow p-5 space-y-4 max-w-2xl">
+      <form onSubmit={changePassword} className="card p-5 space-y-4">
         <div>
-          <h3 className="text-lg font-bold text-gray-800">পাসওয়ার্ড পরিবর্তন</h3>
-          <p className="text-sm text-gray-500">
-            প্রথমবার ডিফল্ট পাসওয়ার্ড <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">admin</code> দিয়ে লগইন করলে এখান থেকে নিজের পাসওয়ার্ড সেট করুন।
+          <h3 className="section-title">পাসওয়ার্ড পরিবর্তন</h3>
+          <p className="text-sm text-slate-500 mt-1">
+            প্রথমবার ডিফল্ট পাসওয়ার্ড <code className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-xs">admin</code> দিয়ে লগইন করলে এখান থেকে নিজের পাসওয়ার্ড সেট করুন।
           </p>
         </div>
 
         {pwMsg && (
-          <div className={`text-sm px-3 py-2 rounded ${pwOk ? 'text-teal-700 bg-teal-50' : 'text-red-600 bg-red-50'}`}>
+          <div className={`text-sm px-4 py-2.5 rounded-lg border ${pwOk ? 'text-teal-700 bg-teal-50 border-teal-200' : 'text-red-700 bg-red-50 border-red-200'}`}>
             {pwMsg}
           </div>
         )}
@@ -312,7 +314,7 @@ export default function Settings() {
         <button
           type="submit"
           disabled={pwBusy}
-          className="bg-teal-600 text-white rounded-md px-5 py-2 hover:bg-teal-700 disabled:opacity-50"
+          className="btn btn-primary"
         >
           {pwBusy ? 'পরিবর্তন হচ্ছে…' : 'পাসওয়ার্ড পরিবর্তন করো'}
         </button>

@@ -1,25 +1,26 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { api } from '../services/api.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem('auth_token'));
-  const [isAuthenticated, setIsAuthenticated] = useState(!!token);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = (newToken) => {
-    localStorage.setItem('auth_token', newToken);
-    setToken(newToken);
-    setIsAuthenticated(true);
-  };
+  useEffect(() => {
+    const unsubscribe = api.subscribeAuth((u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem('auth_token');
-    setToken(null);
-    setIsAuthenticated(false);
-  };
+  const login = (email, password) => api.login(email, password);
+
+  const logout = () => api.logout();
 
   return (
-    <AuthContext.Provider value={{ token, isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
