@@ -1,6 +1,10 @@
 // Firebase সংযোগ — এই কনফিগ পাবলিক, গোপন নয় (নিরাপত্তা Security Rules দিয়ে হয়)
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -13,5 +17,11 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// অফলাইন পার্সিসটেন্স: সব ডেটা ব্রাউজারের IndexedDB-তে ক্যাশ হয়।
+// ইন্টারনেট না থাকলেও আগে-লোড-হওয়া ডেটা পড়া/লেখা যায়; অনলাইনে ফিরলে লেখাগুলো নিজে থেকেই সিঙ্ক হয়।
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+});
+
 export const auth = getAuth(app);

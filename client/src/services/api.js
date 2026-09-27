@@ -520,10 +520,17 @@ const casesApi = {
   },
 
   getRecentCases: async (limit = 5) => {
-    const countSnap = await getCountFromServer(collection(db, 'cases'));
-    const total = countSnap.data().count;
-
     const all = (await allDocs('cases')).sort(byDateDesc);
+
+    // অনলাইনে সার্ভার থেকে নিখুঁত কাউন্ট; অফলাইনে লোকাল ক্যাশের কাউন্ট ব্যবহার হয়
+    let total = all.length;
+    try {
+      const countSnap = await getCountFromServer(collection(db, 'cases'));
+      total = countSnap.data().count;
+    } catch {
+      /* অফলাইন — সার্ভার কাউন্ট পাওয়া যায়নি, লোকাল কাউন্টই যথেষ্ট */
+    }
+
     const recent = all.slice(0, limit);
     const patients = await allDocs('patients');
     const pmap = new Map(patients.map((p) => [p.id, p.name]));
@@ -929,6 +936,23 @@ const authApi = {
   },
 };
 
+// ---------- অফলাইন প্রি-ক্যাশ ----------
+
+// সব রেফারেন্স + ইউজার ডেটা একবার পড়লে Firestore-এর IndexedDB ক্যাশে জমা হয়,
+// ফলে ইন্টারনেট না থাকলেও এই ডেটা পড়া/লেখা চলে এবং বিশ্লেষণও কাজ করে।
+async function preloadForOffline() {
+  await Promise.all([
+    allDocs('remedies'),
+    allDocs('rubrics'),
+    allDocs('rubric_links'),
+    allDocs('patients'),
+    allDocs('cases'),
+    allDocs('prescriptions'),
+    getDoc(doc(db, 'settings', 'clinic')),
+  ]);
+  return { ok: true };
+}
+
 // ---------- একত্রে ----------
 
 export const api = {
@@ -940,4 +964,5 @@ export const api = {
   ...settingsApi,
   ...backupApi,
   ...authApi,
+  preloadForOffline,
 };
