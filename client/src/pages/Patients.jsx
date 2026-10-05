@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../services/api.js';
+import { api, formatDateBD } from '../services/api.js';
 
 const empty = { name: '', age: '', gender: '', phone: '' };
 
@@ -169,7 +169,7 @@ export default function Patients() {
                   <td className="px-4 py-3 text-slate-600">{p.age || '—'}</td>
                   <td className="px-4 py-3 text-slate-600">{p.gender || '—'}</td>
                   <td className="px-4 py-3 text-slate-600">{p.phone || '—'}</td>
-                  <td className="px-4 py-3 text-slate-400">{p.created_at}</td>
+                  <td className="px-4 py-3 text-slate-400">{formatDateBD(p.created_at)}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <button onClick={() => startEdit(p)} className="text-xs font-medium text-teal-600 hover:underline mr-3">
                       সম্পাদনা

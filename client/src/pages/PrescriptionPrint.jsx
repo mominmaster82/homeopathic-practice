@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api } from '../services/api.js';
+import { api, formatDateBD } from '../services/api.js';
 import { extraCaseFields } from './caseFields.js';
 
 export default function PrescriptionPrint() {
@@ -92,7 +92,7 @@ export default function PrescriptionPrint() {
           </div>
           <div className="text-right space-y-0.5">
             <div><b>কেস:</b> #{caseData.id}</div>
-            <div><b>তারিখ:</b> {caseData.date}</div>
+            <div><b>তারিখ:</b> {formatDateBD(caseData.date)}</div>
           </div>
         </div>
 

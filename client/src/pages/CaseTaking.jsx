@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../services/api.js';
+import { api, formatDateBD } from '../services/api.js';
 import { extraCaseFields } from './caseFields.js';
 
 const input = 'input';
@@ -177,7 +177,7 @@ export default function CaseTaking() {
                   className="w-full text-left px-3 py-2.5 hover:bg-teal-50 flex justify-between items-center text-sm font-medium text-slate-700"
                 >
                   <span>কেস #{c.id}</span>
-                  <span className="text-xs font-normal text-slate-400">{c.date}</span>
+                  <span className="text-xs font-normal text-slate-400">{formatDateBD(c.date)}</span>
                 </button>
 
                 {openCase === c.id && caseDetail && (

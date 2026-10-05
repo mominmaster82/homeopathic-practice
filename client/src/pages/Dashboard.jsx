@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../services/api.js';
+import { api, formatDateBD } from '../services/api.js';
 
 const statTone = {
   teal: 'bg-teal-50 text-teal-700 border-teal-100',
@@ -135,7 +135,7 @@ export default function Dashboard() {
                     #{c.id} · {c.patient_name}
                   </div>
                   <div className="text-xs text-slate-400 truncate">
-                    {c.date}
+                    {formatDateBD(c.date)}
                     {c.symptoms ? ` · ${c.symptoms}` : ''}
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { api } from '../services/api.js';
+import { api, formatDateBD } from '../services/api.js';
 import { extraCaseFields } from './caseFields.js';
 
 const potencies = ['6C', '30C', '200C', '1M', '0/1 (LM)', 'Q (মাতৃটিংচার)'];
@@ -227,7 +227,7 @@ export default function PatientProfile() {
                 {[p.age ? `বয়স: ${p.age}` : null, p.gender ? `লিঙ্গ: ${p.gender}` : null, p.phone ? `ফোন: ${p.phone}` : null]
                   .filter(Boolean).join(' · ') || 'কোনো অতিরিক্ত তথ্য নেই'}
               </p>
-              <p className="mt-1 text-xs text-slate-400">যোগ হয়েছে: {p.created_at}</p>
+              <p className="mt-1 text-xs text-slate-400">যোগ হয়েছে: {formatDateBD(p.created_at)}</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -335,7 +335,7 @@ export default function PatientProfile() {
         <div className="card col-span-2 p-5 transition hover:shadow-card sm:col-span-1">
           <div className="text-sm text-slate-500">সর্বশেষ সাক্ষাৎ</div>
           <div className="mt-1 text-lg font-semibold text-slate-800">
-            {caseCount ? p.cases[0].date : '—'}
+            {caseCount ? formatDateBD(p.cases[0].date) : '—'}
           </div>
         </div>
       </div>
@@ -364,7 +364,7 @@ export default function PatientProfile() {
                       )}
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-xs text-slate-400">{c.date}</span>
+                      <span className="text-xs text-slate-400">{formatDateBD(c.date)}</span>
                       <Link to={`/print/${c.id}`} className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline">
                         🖨 প্রিন্ট / PDF
                       </Link>

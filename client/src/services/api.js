@@ -29,8 +29,19 @@ import { db, auth } from '../firebase.js';
 
 const num = (v) => Number(v);
 
-// SQLite-এর datetime('now')-এর মতো ফরম্যাট: "YYYY-MM-DD HH:MM:SS"
-const now = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
+// বাংলাদেশ স্টান্ডার্ড টাইম (GMT+6) — "YYYY-MM-DD HH:MM:SS"
+const BD_OFFSET_MS = 6 * 60 * 60 * 1000;
+const now = () => new Date(Date.now() + BD_OFFSET_MS).toISOString().slice(0, 19).replace('T', ' ');
+
+// সংরক্ষিত তারিখ-স্ট্রিং → dd/mm/yyyy (সময় থাকলে hh:mm সহ) ডিসপ্লে ফরম্যাট
+export function formatDateBD(value) {
+  const s = String(value ?? '').trim();
+  if (!s) return '—';
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+  if (!m) return s;
+  const d = `${m[3]}/${m[2]}/${m[1]}`;
+  return m[4] ? `${d} ${m[4]}:${m[5]}` : d;
+}
 
 // খালি/ফাঁকা মানকে null বানাই
 const nullable = (v) => (v === undefined || v === null || v === '' ? null : v);
@@ -706,7 +717,7 @@ const backupApi = {
 
     return {
       version: 2,
-      exported_at: new Date().toISOString(),
+      exported_at: now(),
       data: {
         patients,
         cases,

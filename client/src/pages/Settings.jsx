@@ -74,7 +74,9 @@ export default function Settings() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `homeopathy-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      // বাংলাদেশ সময়ের তারিখ (GMT+6) — ফাইলের নামে dd-mm-yyyy
+      const bdDate = new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      a.download = `homeopathy-backup-${bdDate}.json`;
       a.click();
       URL.revokeObjectURL(url);
       setBackupMsg('ব্যাকআপ ডাউনলোড সম্পন্ন'); setBackupOk(true);
