@@ -147,7 +147,10 @@ export default function MateriaMedica() {
         !q ||
         r.name.toLowerCase().includes(q) ||
         (r.source || '').toLowerCase().includes(q) ||
-        (r.keynotes || '').toLowerCase().includes(q);
+        (r.keynotes || '').toLowerCase().includes(q) ||
+        (r.clinical || '').toLowerCase().includes(q) ||
+        (r.better || '').toLowerCase().includes(q) ||
+        (r.worse || '').toLowerCase().includes(q);
       return matchesLetter && matchesQuery;
     });
   }, [remedies, query, letter]);
@@ -326,7 +329,7 @@ export default function MateriaMedica() {
 
       <input
         className="input max-w-md"
-        placeholder="🔍 ওষুধ খুঁজুন (নাম, উৎস বা কী-নোট)..."
+        placeholder="🔍 ওষুধ খুঁজুন (নাম, উৎস, কী-নোট, ক্লিনিক্যাল, ভালো/মন্দ)..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
