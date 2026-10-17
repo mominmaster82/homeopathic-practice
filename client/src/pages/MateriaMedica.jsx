@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api.js';
+import { suggestRubricsForRemedy } from '../utils/linkSuggest.js';
 
 // গ্রেড দেখানোর জন্য তিনটি বিন্দু (● ● ●)
 function GradeDots({ grade }) {
@@ -111,6 +112,10 @@ export default function MateriaMedica() {
   const [sectionRubrics, setSectionRubrics] = useState([]);
   const [linkRubricId, setLinkRubricId] = useState('');
   const [linkGrade, setLinkGrade] = useState(1);
+  const [allRubrics, setAllRubrics] = useState(null); // প্রস্তাব তৈরির জন্য সব রুব্রিক
+  const [suggestions, setSuggestions] = useState(null); // null = বন্ধ
+  const [suggestGrades, setSuggestGrades] = useState({});
+  const [suggestBusy, setSuggestBusy] = useState(false);
   const focusApplied = useRef(null);
 
   const loadRemedies = () => api.getRemedies().then(setRemedies).catch((e) => setMsg(e.message));
@@ -172,6 +177,7 @@ export default function MateriaMedica() {
     setNotice(null);
     setEditing(false);
     setShowLinkPicker(false);
+    setSuggestions(null);
     setLoadingProfile(true);
     setProfile(null);
     try {
@@ -191,6 +197,65 @@ export default function MateriaMedica() {
     }
   };
 
+  // প্রস্তাবিত রুব্রিক — কী-নোট/ক্লিনিক্যালের সাথে টেক্সট মিলিয়ে
+  const loadRubricSuggestions = async (remedy, linkedRows = []) => {
+    setSuggestBusy(true);
+    try {
+      const rubrics = allRubrics || (await api.getRubrics());
+      if (!allRubrics) setAllRubrics(rubrics);
+      const list = suggestRubricsForRemedy(remedy, rubrics, {
+        excludeIds: (linkedRows || []).map((r) => r.id),
+      });
+      setSuggestions(list);
+      setSuggestGrades(Object.fromEntries(list.map((s) => [s.rubric.id, 1])));
+    } catch (e) {
+      setNotice({ text: e.message, ok: false });
+    } finally {
+      setSuggestBusy(false);
+    }
+  };
+
+  const toggleSuggestions = () => {
+    if (suggestions) {
+      setSuggestions(null);
+      return;
+    }
+    loadRubricSuggestions(selected, profile || []);
+  };
+
+  // মাঝপথে ম্যানুয়ালি লিংক করলে প্রস্তাব-তালিকা থেকেও সরে যায়
+  const visibleSuggestions = useMemo(() => {
+    if (!suggestions) return [];
+    const linked = new Set((profile || []).map((p) => p.id));
+    return suggestions.filter((s) => !linked.has(s.rubric.id));
+  }, [suggestions, profile]);
+
+  const addSuggestedLink = async (s) => {
+    setNotice(null);
+    try {
+      await api.addRemedyRubric(selected.id, s.rubric.id, Number(suggestGrades[s.rubric.id] || 1));
+      await refreshProfile(selected.id);
+      setNotice({ text: `“${s.rubric.rubric_text}” রুব্রিক যুক্ত হয়েছে`, ok: true });
+    } catch (e) {
+      setNotice({ text: e.message, ok: false });
+    }
+  };
+
+  const addAllSuggestedLinks = async () => {
+    if (visibleSuggestions.length === 0) return;
+    if (!confirm(`${visibleSuggestions.length}টি প্রস্তাবিত রুব্রিক যোগ করবেন? গ্রেডগুলো মিলিয়ে নিন।`)) return;
+    setNotice(null);
+    try {
+      for (const s of visibleSuggestions) {
+        await api.addRemedyRubric(selected.id, s.rubric.id, Number(suggestGrades[s.rubric.id] || 1));
+      }
+      await refreshProfile(selected.id);
+      setNotice({ text: `${visibleSuggestions.length}টি রুব্রিক যুক্ত হয়েছে`, ok: true });
+    } catch (e) {
+      setNotice({ text: e.message, ok: false });
+    }
+  };
+
   // নতুন ওষুধ যোগ
   const submitAdd = async (form) => {
     setNotice(null);
@@ -198,8 +263,9 @@ export default function MateriaMedica() {
       const created = await api.addRemedy(form);
       await loadRemedies();
       setShowAddForm(false);
-      openRemedy(created);
-      setNotice({ text: `"${created.name}" যোগ করা হয়েছে`, ok: true });
+      await openRemedy(created);
+      setNotice({ text: `"${created.name}" যোগ করা হয়েছে — নিচে প্রস্তাবিত রুব্রিক দেখুন`, ok: true });
+      loadRubricSuggestions(created, []);
     } catch (e) {
       setNotice({ text: e.message, ok: false });
     }
@@ -209,10 +275,12 @@ export default function MateriaMedica() {
   const submitEdit = async (form) => {
     setNotice(null);
     try {
-      const updated = await api.updateRemedy(selected.id, form);
+      await api.updateRemedy(selected.id, form);
+      const updated = { ...selected, ...form };
       await loadRemedies();
       setSelected(updated);
       setEditing(false);
+      setSuggestions(null); // টেক্সট বদলেছে — প্রস্তাব আবার খুঁজতে হবে
       setNotice({ text: 'সম্পাদনা সংরক্ষিত হয়েছে', ok: true });
     } catch (e) {
       setNotice({ text: e.message, ok: false });
@@ -300,7 +368,7 @@ export default function MateriaMedica() {
         <div>
           <h2 className="page-title">ম্যাটেরিয়া মেডিকা</h2>
           <p className="page-sub">
-            ওষুধ বেছে নিয়ে তার কী-নোট ও রেপার্টরি প্রোফাইল দেখুন — নিজের বিচারে নতুন ওষুধও যোগ করতে পারবেন।
+            ওষুধ বেছে নিয়ে তার কী-নোট ও রেপার্টরি প্রোফাইল দেখুন — নতুন ওষুধ যোগ করলে টেক্সট-মিলে পাওয়া রুব্রিকের প্রস্তাব স্বয়ংক্রিয়ভাবে দেখাবে।
           </p>
         </div>
         <button
@@ -465,12 +533,19 @@ export default function MateriaMedica() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="section-title text-slate-700">রেপার্টরি প্রোফাইল</h4>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     {profile && (
                       <span className="text-xs text-slate-400 inline-flex items-center gap-1">
                         {profile.length} রুব্রিকে আছে · গ্রেড <GradeDots grade={3} /> = শক্তিশালী
                       </span>
                     )}
+                    <button
+                      onClick={toggleSuggestions}
+                      disabled={suggestBusy || loadingProfile}
+                      className="btn btn-sm border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                    >
+                      {suggestBusy ? '⟳ খোঁজা হচ্ছে…' : suggestions ? '✕ প্রস্তাব বন্ধ' : '✨ প্রস্তাবিত রুব্রিক'}
+                    </button>
                     <button
                       onClick={() => setShowLinkPicker((v) => !v)}
                       className="btn btn-sm border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
@@ -522,9 +597,71 @@ export default function MateriaMedica() {
 
                 {loadingProfile && <div className="py-2 text-sm text-slate-400">লোড হচ্ছে…</div>}
 
+                {suggestions && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 mb-3 space-y-2">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-semibold text-amber-800">টেক্সট মিলিয়ে পাওয়া রুব্রিক</div>
+                        <p className="text-xs text-amber-700/80">
+                          স্বয়ংক্রিয় প্রস্তাব — গ্রেড মিলিয়ে যাচাই করে যোগ করুন।
+                        </p>
+                      </div>
+                      {visibleSuggestions.length > 1 && (
+                        <button
+                          onClick={addAllSuggestedLinks}
+                          className="btn btn-sm border border-amber-300 bg-white text-amber-800 hover:bg-amber-100"
+                        >
+                          সব যোগ করুন ({visibleSuggestions.length})
+                        </button>
+                      )}
+                    </div>
+
+                    {visibleSuggestions.length === 0 ? (
+                      <p className="text-sm text-amber-800/80 py-1">
+                        {suggestions.length === 0
+                          ? 'কোনো মিল পাওয়া যায়নি — উপরের "＋ রুব্রিক যোগ" দিয়ে নিজে বেছে নিতে পারেন।'
+                          : 'সব প্রস্তাবিত রুব্রিক ইতিমধ্যে যুক্ত হয়েছে।'}
+                      </p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {visibleSuggestions.map((s) => (
+                          <li key={s.rubric.id} className="rounded-md border border-amber-100 bg-white px-2 py-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs rounded-full bg-slate-100 text-slate-500 px-2 py-0.5">
+                                {s.rubric.section}
+                              </span>
+                              <span className="flex-1 min-w-[10rem] text-sm text-slate-700">
+                                {s.rubric.rubric_text}
+                              </span>
+                              <select
+                                className="text-xs border border-slate-200 rounded px-1 py-0.5 text-slate-600 bg-white"
+                                value={suggestGrades[s.rubric.id] || 1}
+                                title="গ্রেড"
+                                onChange={(e) =>
+                                  setSuggestGrades((g) => ({ ...g, [s.rubric.id]: Number(e.target.value) }))
+                                }
+                              >
+                                <option value={1}>গ্রেড ১</option>
+                                <option value={2}>গ্রেড ২</option>
+                                <option value={3}>গ্রেড ৩</option>
+                              </select>
+                              <button onClick={() => addSuggestedLink(s)} className="btn btn-primary btn-sm">
+                                যোগ
+                              </button>
+                            </div>
+                            {s.reasons.length > 0 && (
+                              <div className="text-xs text-amber-700/80 mt-0.5">{s.reasons.join(' · ')}</div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
                 {!loadingProfile && grouped.length === 0 && profile && (
                   <div className="py-8 text-center text-sm text-slate-400">
-                    এই ওষুধটির জন্য কোনো রুব্রিক লিংক নেই — উপরের "＋ রুব্রিক যোগ" থেকে যুক্ত করুন।
+                    এই ওষুধটির জন্য কোনো রুব্রিক লিংক নেই — "✨ প্রস্তাবিত রুব্রিক" দেখুন বা "＋ রুব্রিক যোগ" দিয়ে নিজে বেছে নিন।
                   </div>
                 )}
 

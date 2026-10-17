@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api.js';
+import { suggestRemediesForRubric } from '../utils/linkSuggest.js';
 
 const input = 'input';
 const label = 'label';
@@ -83,6 +84,8 @@ export default function Repertory() {
   const [pickRemedyId, setPickRemedyId] = useState('');
   const [pickGrade, setPickGrade] = useState(1);
   const [showRemedyPicker, setShowRemedyPicker] = useState(false);
+  const [suggestions, setSuggestions] = useState(null); // খোলা রুব্রিকের প্রস্তাবিত ওষুধ
+  const [suggestGrades, setSuggestGrades] = useState({});
 
   const loadSections = () => api.getSections().then(setSections).catch(() => {});
   const loadRubrics = () =>
@@ -143,12 +146,14 @@ export default function Repertory() {
 
   // রুব্রিক খোলা/বন্ধ + তার ওষুধ লোড
   const openRubric = async (id) => {
+    setSuggestions(null);
     if (open === id) { setOpen(null); return; }
     setOpen(id);
     setNotice(null);
     setShowRemedyPicker(false);
     setPickRemedyId('');
     setPickGrade(1);
+    setRemedies([]);
     setRemedies(await api.getRubricRemedies(id));
   };
 
@@ -162,14 +167,23 @@ export default function Repertory() {
 
   const goToAnalysis = () => navigate('/analysis', { state: { rubricIds: selected } });
 
-  // নতুন রুব্রিক যোগ
+  // নতুন রুব্রিক যোগ — যোগ করেই প্রস্তাবিত ওষুধ দেখাই
   const submitAdd = async (form) => {
     setNotice(null);
     try {
       const created = await api.addRubric(form);
       setShowAddForm(false);
-      await Promise.all([loadSections(), loadRubrics()]);
-      setNotice({ text: `"${created.rubric_text}" রুব্রিক যোগ করা হয়েছে`, ok: true });
+      await loadSections();
+      setSection(created.section);
+      setQuery(created.rubric_text); // নতুন রুব্রিকটি যেন সাথে সাথেই চোখে পড়ে
+      setRubrics(await api.getRubrics(created.section));
+      setOpen(created.id);
+      setRemedies([]);
+      setShowRemedyPicker(false);
+      setPickRemedyId('');
+      setPickGrade(1);
+      setNotice({ text: `"${created.rubric_text}" রুব্রিক যোগ করা হয়েছে — নিচে প্রস্তাবিত ওষুধ দেখুন`, ok: true });
+      loadRemedySuggestions(created, []);
     } catch (e) {
       setNotice({ text: e.message, ok: false });
     }
@@ -181,6 +195,7 @@ export default function Repertory() {
     try {
       await api.updateRubric(id, form);
       setEditingId(null);
+      setSuggestions(null); // টেক্সট বদলেছে — প্রস্তাব আবার খুঁজতে হবে
       await Promise.all([loadSections(), loadRubrics()]);
       setNotice({ text: 'সম্পাদনা সংরক্ষিত হয়েছে', ok: true });
     } catch (e) {
@@ -214,6 +229,63 @@ export default function Repertory() {
       setPickGrade(1);
       setShowRemedyPicker(false);
       setNotice({ text: 'ওষুধ যুক্ত হয়েছে', ok: true });
+    } catch (e) {
+      setNotice({ text: e.message, ok: false });
+    }
+  };
+
+  // প্রস্তাবিত ওষুধ — রুব্রিকের টেক্সটের সাথে কী-নোট/ক্লিনিক্যাল মিলিয়ে
+  const loadRemedySuggestions = async (rubric, linkedRows = []) => {
+    try {
+      const pool = allRemedies.length ? allRemedies : await api.getRemedies();
+      if (!allRemedies.length) setAllRemedies(pool);
+      const list = suggestRemediesForRubric(rubric, pool, {
+        excludeIds: (linkedRows || []).map((m) => m.id),
+      });
+      setSuggestions(list);
+      setSuggestGrades(Object.fromEntries(list.map((s) => [s.remedy.id, 1])));
+    } catch (e) {
+      setNotice({ text: e.message, ok: false });
+    }
+  };
+
+  const toggleSuggestions = (rubric) => {
+    if (suggestions) {
+      setSuggestions(null);
+      return;
+    }
+    setShowRemedyPicker(false);
+    loadRemedySuggestions(rubric, remedies);
+  };
+
+  // মাঝপথে ম্যানুয়ালি লিংক করলে প্রস্তাব-তালিকা থেকেও সরে যায়
+  const visibleSuggestions = useMemo(() => {
+    if (!suggestions) return [];
+    const linked = new Set(remedies.map((m) => m.id));
+    return suggestions.filter((s) => !linked.has(s.remedy.id));
+  }, [suggestions, remedies]);
+
+  const addSuggestedRemedy = async (rubricId, s) => {
+    setNotice(null);
+    try {
+      await api.addRubricRemedy(rubricId, s.remedy.id, Number(suggestGrades[s.remedy.id] || 1));
+      await refreshRemedies(rubricId);
+      setNotice({ text: `“${s.remedy.name}” যুক্ত হয়েছে`, ok: true });
+    } catch (e) {
+      setNotice({ text: e.message, ok: false });
+    }
+  };
+
+  const addAllSuggestedRemedies = async (rubricId) => {
+    if (visibleSuggestions.length === 0) return;
+    if (!confirm(`${visibleSuggestions.length}টি ওষুধ যোগ করবেন? গ্রেডগুলো মিলিয়ে নিন।`)) return;
+    setNotice(null);
+    try {
+      for (const s of visibleSuggestions) {
+        await api.addRubricRemedy(rubricId, s.remedy.id, Number(suggestGrades[s.remedy.id] || 1));
+      }
+      await refreshRemedies(rubricId);
+      setNotice({ text: `${visibleSuggestions.length}টি ওষুধ যুক্ত হয়েছে`, ok: true });
     } catch (e) {
       setNotice({ text: e.message, ok: false });
     }
@@ -417,13 +489,88 @@ export default function Repertory() {
                           )}
                         </div>
 
-                        <div>
-                          <button
-                            onClick={() => { setShowRemedyPicker((v) => !v); setNotice(null); }}
-                            className="btn btn-sm border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
-                          >
-                            {showRemedyPicker ? '✕ বন্ধ' : '＋ ওষুধ যোগ'}
-                          </button>
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() => { setShowRemedyPicker((v) => !v); setNotice(null); }}
+                              className="btn btn-sm border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
+                            >
+                              {showRemedyPicker ? '✕ বন্ধ' : '＋ ওষুধ যোগ'}
+                            </button>
+                            <button
+                              onClick={() => toggleSuggestions(r)}
+                              className="btn btn-sm border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                            >
+                              {suggestions ? '✕ প্রস্তাব বন্ধ' : '✨ প্রস্তাবিত ওষুধ'}
+                            </button>
+                          </div>
+
+                          {suggestions && (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-2">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                  <div className="text-sm font-semibold text-amber-800">টেক্সট মিলিয়ে পাওয়া ওষুধ</div>
+                                  <p className="text-xs text-amber-700/80">
+                                    স্বয়ংক্রিয় প্রস্তাব — কী-নোট দেখে যাচাই করে যোগ করুন।
+                                  </p>
+                                </div>
+                                {visibleSuggestions.length > 1 && (
+                                  <button
+                                    onClick={() => addAllSuggestedRemedies(r.id)}
+                                    className="btn btn-sm border border-amber-300 bg-white text-amber-800 hover:bg-amber-100"
+                                  >
+                                    সব যোগ করুন ({visibleSuggestions.length})
+                                  </button>
+                                )}
+                              </div>
+
+                              {visibleSuggestions.length === 0 ? (
+                                <p className="text-sm text-amber-800/80 py-1">
+                                  {suggestions.length === 0
+                                    ? 'কোনো মিল পাওয়া যায়নি — "＋ ওষুধ যোগ" দিয়ে নিজে বেছে নিতে পারেন।'
+                                    : 'সব প্রস্তাবিত ওষুধ ইতিমধ্যে যুক্ত হয়েছে।'}
+                                </p>
+                              ) : (
+                                <ul className="space-y-1.5">
+                                  {visibleSuggestions.map((s) => (
+                                    <li key={s.remedy.id} className="rounded-md border border-amber-100 bg-white px-2 py-1.5">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="flex-1 min-w-[8rem] text-sm text-slate-700">{s.remedy.name}</span>
+                                        <button
+                                          onClick={() => navigate('/materia', { state: { focusRemedyId: s.remedy.id } })}
+                                          title="ম্যাটেরিয়া মেডিকায় এই ওষুধ দেখুন"
+                                          className="text-xs text-amber-700 underline hover:text-amber-900"
+                                        >
+                                          বিস্তারিত ↗
+                                        </button>
+                                        <select
+                                          className="text-xs border border-slate-200 rounded px-1 py-0.5 text-slate-600 bg-white"
+                                          value={suggestGrades[s.remedy.id] || 1}
+                                          title="গ্রেড"
+                                          onChange={(e) =>
+                                            setSuggestGrades((g) => ({ ...g, [s.remedy.id]: Number(e.target.value) }))
+                                          }
+                                        >
+                                          <option value={1}>গ্রেড ১</option>
+                                          <option value={2}>গ্রেড ২</option>
+                                          <option value={3}>গ্রেড ৩</option>
+                                        </select>
+                                        <button
+                                          onClick={() => addSuggestedRemedy(r.id, s)}
+                                          className="btn btn-primary btn-sm"
+                                        >
+                                          যোগ
+                                        </button>
+                                      </div>
+                                      {s.reasons.length > 0 && (
+                                        <div className="text-xs text-amber-700/80 mt-0.5">{s.reasons.join(' · ')}</div>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          )}
 
                           {showRemedyPicker && (
                             <div className="mt-2 bg-slate-50 rounded-lg border border-slate-200 p-3 flex flex-wrap gap-2 items-end">
