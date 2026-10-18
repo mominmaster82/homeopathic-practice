@@ -17,6 +17,10 @@ const BN_STOP = new Set([
   'তার', 'তাঁর', 'আমার', 'আপনার', 'একই', 'কিন্তু', 'তাই', 'সালে', 'দিন', 'সময়', 'রোগী',
   'বাড়ে', 'বেড়ে', 'ভালো', 'কমে', 'শুরু', 'থাকে', 'লাগে', 'মনে', 'হলো', 'ওঠে', 'আসে',
   'যায়', 'দেয়',
+  // রুব্রিকে ঘন ঘন আসা অথচ লক্ষণ-নির্দেশক নয় এমন শব্দ ("বমি ভাব", "ফেটে যাওয়ার মতো"):
+  // এগুলো বাদ না দিলে দুটি সাধারণ শব্দ মিলেই অপ্রাসঙ্গিক রুব্রিক প্রস্তাব হয়ে যায়।
+  // পুরো শব্দবন্ধ হুবহু মিললে (যেমন "বমি ভাব") তা এখনও ধরা পড়ে — শুধু আলাদা টোকেন হিসেবে বাদ যায়।
+  'ভাব', 'যাওয়া', 'যাওয়ার', 'দিয়ে', 'সহ',
 ]);
 
 // এই স্কোরের নিচে মিল হলে প্রস্তাব দেখানো হয় না
@@ -71,12 +75,27 @@ function remedyDoc(remedy) {
   });
 }
 
-// "টনসিল" ↔ "টনসিলিটিস" / "cough" ↔ "coughs" — কাণ্ড-শব্দ মিলিয়ে দেখি
+// বাংলা শব্দ ছোট হলেও অর্থবহ ("হজম", "জিভ"), ইংরেজিতে ছোট শব্দ মিলিয়ে ভুল বাড়ে
+const minStemLen = (t) => (/^[a-z]+$/.test(t) ? 4 : 3);
+
+// "টনসিল" ↔ "টনসিলিটিস" / "হজম" ↔ "হজমের" — কাণ্ড-শব্দ মিলিয়ে দেখি
 function stemHit(words, token) {
-  if (charLen(token) < 4) return null;
+  if (charLen(token) < minStemLen(token)) return null;
   for (const word of words) {
-    if (charLen(word) < 4) continue;
+    if (charLen(word) < minStemLen(word)) continue;
     if (word === token || word.startsWith(token) || token.startsWith(word)) return word;
+  }
+  return null;
+}
+
+// আগে হুবহু মিল, না পেলে কাণ্ড-শব্দ মিল — মিললে শব্দটি ফেরায়, নইলে null
+function wordHit(doc, word) {
+  for (const field of doc) {
+    if (field.words.has(word)) return word;
+  }
+  for (const field of doc) {
+    const near = stemHit(field.words, word);
+    if (near) return near;
   }
   return null;
 }
@@ -120,16 +139,19 @@ function matchPhrases(phrases, doc) {
   for (const phrase of unique) {
     for (const word of interestingWords(phrase.raw)) {
       if (seenWords.has(word)) continue;
-      const field = doc.find((f) => f.words.has(word));
-      if (!field) continue;
+      const near = wordHit(doc, word);
+      if (!near) continue;
       seenWords.add(word);
-      tokenHits.push({ word, label: field.label });
+      tokenHits.push({ word, near: near === word ? null : near });
       score += 1;
     }
   }
   if (tokenHits.length >= 2) {
-    const sample = tokenHits.slice(0, 3).map((t) => t.word).join(', ');
-    reasons.push(`${tokenHits[0].label}-এ শব্দ মিলেছে: ${sample}`);
+    const sample = tokenHits
+      .slice(0, 3)
+      .map((t) => (t.near ? `${t.word}≈${t.near}` : t.word))
+      .join(', ');
+    reasons.push(`শব্দ মিলেছে: ${sample}`);
   }
 
   return { score, reasons: [...new Set(reasons)].slice(0, 3) };
