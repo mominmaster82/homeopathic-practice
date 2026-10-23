@@ -20,5 +20,9 @@ for (const col of ['clinical', 'better', 'worse']) {
 if (!remedyCols.includes('is_custom')) {
   db.exec('ALTER TABLE remedies ADD COLUMN is_custom INTEGER DEFAULT 0');
 }
+const rubricCols = db.prepare('PRAGMA table_info(rubrics)').all().map((c) => c.name);
+if (!rubricCols.includes('is_custom')) {
+  db.exec('ALTER TABLE rubrics ADD COLUMN is_custom INTEGER DEFAULT 0');
+}
 
 export default db;

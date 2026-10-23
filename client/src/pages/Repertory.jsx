@@ -2,10 +2,22 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api.js';
 import { suggestRemediesForRubric } from '../utils/linkSuggest.js';
+import { searchRubrics, searchRemedies, highlightSegments } from '../utils/search.js';
 
 const input = 'input';
 const label = 'label';
 const EMPTY_FORM = { section: '', rubric_text: '' };
+
+// সার্চে মিলে যাওয়া অংশটা হাইলাইট করে
+function HighlightedText({ text, words }) {
+  return highlightSegments(text, words).map((part, i) =>
+    part.hit ? (
+      <mark key={i} className="rounded bg-amber-100 px-0.5 text-inherit">{part.text}</mark>
+    ) : (
+      <span key={i}>{part.text}</span>
+    )
+  );
+}
 
 // নতুন/সম্পাদনা রুব্রিক ফর্ম (একই ফর্ম দুই জায়গায়)
 function RubricForm({ initial, sections, onSubmit, onCancel, submitLabel }) {
@@ -69,6 +81,11 @@ export default function Repertory() {
   const [section, setSection] = useState('');
   const [rubrics, setRubrics] = useState([]);
   const [query, setQuery] = useState('');
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestIndex, setSuggestIndex] = useState(0);
+  const [customOnly, setCustomOnly] = useState(
+    () => localStorage.getItem('repertory-custom-only') === '1'
+  );
 
   const [selected, setSelected] = useState([]); // নির্বাচিত রুব্রিক id
   const [open, setOpen] = useState(null);
@@ -81,6 +98,7 @@ export default function Repertory() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [allRemedies, setAllRemedies] = useState([]); // ওষুধ-পিকারের জন্য
+  const [pickQuery, setPickQuery] = useState('');
   const [pickRemedyId, setPickRemedyId] = useState('');
   const [pickGrade, setPickGrade] = useState(1);
   const [showRemedyPicker, setShowRemedyPicker] = useState(false);
@@ -102,6 +120,9 @@ export default function Repertory() {
       .catch(() => {});
     return () => { active = false; };
   }, [section]);
+  useEffect(() => {
+    localStorage.setItem('repertory-custom-only', customOnly ? '1' : '0');
+  }, [customOnly]);
 
   // ম্যাটেরিয়া মেডিকা থেকে পাঠানো ফোকাস রুব্রিক গ্রহণ
   useEffect(() => {
@@ -124,25 +145,38 @@ export default function Repertory() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId, rubrics]);
 
-  // সার্চ অনুযায়ী ফিল্টার
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return rubrics;
-    return rubrics.filter((r) => r.rubric_text.toLowerCase().includes(q));
-  }, [rubrics, query]);
+  // সার্চ — হুবহু না মিললেও কাণ্ড-শব্দ মিলিয়ে সাজানো ফলাফল
+  const customCount = useMemo(() => rubrics.filter((r) => !!r.is_custom).length, [rubrics]);
+  const rubricPool = useMemo(
+    () => (customOnly ? rubrics.filter((r) => !!r.is_custom) : rubrics),
+    [rubrics, customOnly]
+  );
+  const search = useMemo(() => searchRubrics(rubricPool, query), [rubricPool, query]);
+  const filtered = search.items;
+  const topSuggestions = useMemo(
+    () => (query.trim() ? filtered.slice(0, 8) : []),
+    [filtered, query]
+  );
 
   // শাখা অনুযায়ী গ্রুপ
   const grouped = useMemo(() => {
     const map = new Map();
-    for (const r of filtered) {
-      if (!map.has(r.section)) map.set(r.section, []);
-      map.get(r.section).push(r);
+    for (const item of filtered) {
+      const { section: sec } = item.rubric;
+      if (!map.has(sec)) map.set(sec, []);
+      map.get(sec).push(item);
     }
     return [...map.entries()];
   }, [filtered]);
 
   const toggleSelect = (id) =>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+
+  const toggleCustomOnly = () => {
+    const next = !customOnly;
+    setCustomOnly(next);
+    if (next && section) setSection(''); // সব শাখার নিজের রুব্রিক দেখাই
+  };
 
   // রুব্রিক খোলা/বন্ধ + তার ওষুধ লোড
   const openRubric = async (id) => {
@@ -151,10 +185,44 @@ export default function Repertory() {
     setOpen(id);
     setNotice(null);
     setShowRemedyPicker(false);
+    setPickQuery('');
     setPickRemedyId('');
     setPickGrade(1);
     setRemedies([]);
     setRemedies(await api.getRubricRemedies(id));
+  };
+
+  // সাজেশন থেকে রুব্রিকে যাওয়া — রুব্রিকটি খুলে স্ক্রল করে দেখাই
+  const revealRubric = (id) => {
+    if (open !== id) openRubric(id);
+    focusApplied.current = true;
+    setFocusId(id);
+    requestAnimationFrame(() => {
+      document.getElementById(`rubric-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  };
+
+  const pickSuggestion = (item) => {
+    if (!item) return;
+    setSuggestOpen(false);
+    revealRubric(item.rubric.id);
+  };
+
+  const onSearchKeyDown = (e) => {
+    if (e.key === 'Escape') { setSuggestOpen(false); return; }
+    if (!topSuggestions.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!suggestOpen) { setSuggestOpen(true); setSuggestIndex(0); }
+      else setSuggestIndex((i) => (i + 1) % topSuggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!suggestOpen) { setSuggestOpen(true); setSuggestIndex(topSuggestions.length - 1); }
+      else setSuggestIndex((i) => (i - 1 + topSuggestions.length) % topSuggestions.length);
+    } else if (e.key === 'Enter' && suggestOpen) {
+      e.preventDefault();
+      pickSuggestion(topSuggestions[Math.min(suggestIndex, topSuggestions.length - 1)]);
+    }
   };
 
   const refreshRemedies = async (id) => {
@@ -178,8 +246,16 @@ export default function Repertory() {
       setQuery(created.rubric_text); // নতুন রুব্রিকটি যেন সাথে সাথেই চোখে পড়ে
       setRubrics(await api.getRubrics(created.section));
       setOpen(created.id);
+      focusApplied.current = true;
+      setFocusId(created.id);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.getElementById(`rubric-${created.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      });
       setRemedies([]);
       setShowRemedyPicker(false);
+      setPickQuery('');
       setPickRemedyId('');
       setPickGrade(1);
       setNotice({ text: `"${created.rubric_text}" রুব্রিক যোগ করা হয়েছে — নিচে প্রস্তাবিত ওষুধ দেখুন`, ok: true });
@@ -225,6 +301,7 @@ export default function Repertory() {
     try {
       await api.addRubricRemedy(rubricId, Number(pickRemedyId), Number(pickGrade));
       await refreshRemedies(rubricId);
+      setPickQuery('');
       setPickRemedyId('');
       setPickGrade(1);
       setShowRemedyPicker(false);
@@ -321,6 +398,13 @@ export default function Repertory() {
     return allRemedies.filter((r) => !linked.has(r.id));
   }, [allRemedies, remedies]);
 
+  // পিকারের সার্চ — নাম/উৎস/লক্ষণ মিলিয়ে
+  const pickSearch = useMemo(
+    () => searchRemedies(linkableRemedies, pickQuery),
+    [linkableRemedies, pickQuery]
+  );
+  const pickOptions = pickQuery.trim() ? pickSearch.items.slice(0, 50) : pickSearch.items;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -358,12 +442,81 @@ export default function Repertory() {
         />
       )}
 
-      <input
-        className="input max-w-sm"
-        placeholder="🔍 রুব্রিক খুঁজুন..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <div
+          className="relative w-full max-w-sm"
+          onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setSuggestOpen(false); }}
+        >
+          <input
+            className="input"
+            placeholder="🔍 রুব্রিক খুঁজুন..."
+            value={query}
+            onChange={(e) => {
+              const value = e.target.value;
+              setQuery(value);
+              setSuggestIndex(0);
+              setSuggestOpen(!!value.trim());
+            }}
+            onFocus={() => {
+              if (query.trim()) { setSuggestIndex(0); setSuggestOpen(true); }
+            }}
+            onKeyDown={onSearchKeyDown}
+            role="combobox"
+            aria-expanded={suggestOpen && !!query.trim()}
+            aria-controls="rubric-search-suggestions"
+            aria-autocomplete="list"
+          />
+          {suggestOpen && query.trim() && (
+            <div
+              id="rubric-search-suggestions"
+              className="absolute z-20 mt-1 w-full max-h-80 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"
+            >
+              {topSuggestions.length === 0 ? (
+                <div className="px-3 py-3 text-sm text-slate-400">কোনো রুব্রিক মেলেনি — বানান বদলে দেখুন।</div>
+              ) : (
+                <>
+                  <div className="sticky top-0 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-400 border-b border-slate-100">
+                    {search.partial ? 'কাছাকাছি রুব্রিক' : 'মিলে যাওয়া রুব্রিক'} · ↑↓ বেছে নিন, Enter খুলুন
+                  </div>
+                  <ul>
+                    {topSuggestions.map((item, i) => (
+                      <li key={item.rubric.id}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onMouseEnter={() => setSuggestIndex(i)}
+                          onClick={() => pickSuggestion(item)}
+                          className={`w-full px-3 py-2 text-left ${i === suggestIndex ? 'bg-teal-50' : 'hover:bg-slate-50'}`}
+                        >
+                          <span className="block text-sm text-slate-700">
+                            <HighlightedText text={item.rubric.rubric_text} words={item.matchedWords} />
+                          </span>
+                          <span className="block text-[11px] text-slate-400">
+                            {item.rubric.section}
+                            {item.rubric.is_custom ? ' · নিজের যোগ করা' : ''}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={toggleCustomOnly}
+          aria-pressed={customOnly}
+          className={`px-3 py-1 rounded-full text-sm border transition ${
+            customOnly
+              ? 'bg-amber-500 text-white border-amber-500 shadow-soft'
+              : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50'
+          }`}
+        >
+          ✨ শুধু নিজের যোগ করা ({customCount})
+        </button>
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -390,11 +543,17 @@ export default function Repertory() {
         </div>
       )}
 
+      {search.partial && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          সব শব্দ মেলেনি — কাছাকাছি রুব্রিক দেখানো হচ্ছে। কম শব্দ লিখে বা বানান বদলে আবার চেষ্টা করুন।
+        </div>
+      )}
+
       {grouped.map(([sec, items]) => (
         <div key={sec} className="card overflow-hidden">
           <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 rounded-t-xl section-title text-slate-700">{sec}</div>
           <div className="divide-y divide-slate-100">
-            {items.map((r) => (
+            {items.map(({ rubric: r, matchedWords }) => (
               <div key={r.id} id={`rubric-${r.id}`} className="px-4 py-2.5 hover:bg-slate-50/60 transition-colors">
                 {editingId === r.id ? (
                   <RubricForm
@@ -423,7 +582,7 @@ export default function Repertory() {
                         className="flex-1 text-left text-sm font-medium text-slate-700 hover:text-teal-700 flex justify-between items-center gap-2"
                       >
                         <span>
-                          {r.rubric_text}
+                          <HighlightedText text={r.rubric_text} words={matchedWords} />
                           {!!r.is_custom && (
                             <span className="badge ml-2 border-amber-200 bg-amber-50 text-amber-700 align-middle">
                               নিজের যোগ করা
@@ -492,7 +651,15 @@ export default function Repertory() {
                         <div className="space-y-2">
                           <div className="flex flex-wrap gap-2">
                             <button
-                              onClick={() => { setShowRemedyPicker((v) => !v); setNotice(null); }}
+                              onClick={() => {
+                                if (showRemedyPicker) {
+                                  setPickQuery('');
+                                  setPickRemedyId('');
+                                  setPickGrade(1);
+                                }
+                                setShowRemedyPicker((v) => !v);
+                                setNotice(null);
+                              }}
                               className="btn btn-sm border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
                             >
                               {showRemedyPicker ? '✕ বন্ধ' : '＋ ওষুধ যোগ'}
@@ -573,39 +740,64 @@ export default function Repertory() {
                           )}
 
                           {showRemedyPicker && (
-                            <div className="mt-2 bg-slate-50 rounded-lg border border-slate-200 p-3 flex flex-wrap gap-2 items-end">
-                              <div className="flex-1 min-w-[12rem]">
-                                <label className={label}>ওষুধ</label>
-                                <select
-                                  className={input}
-                                  value={pickRemedyId}
-                                  onChange={(e) => setPickRemedyId(e.target.value)}
+                            <div className="mt-2 bg-slate-50 rounded-lg border border-slate-200 p-3 space-y-2">
+                              <div className="flex flex-wrap gap-2 items-end">
+                                <div className="flex-1 min-w-[12rem]">
+                                  <label className={label}>ওষুধ খুঁজুন</label>
+                                  <input
+                                    className={input}
+                                    value={pickQuery}
+                                    onChange={(e) => {
+                                      setPickQuery(e.target.value);
+                                      setPickRemedyId('');
+                                    }}
+                                    placeholder="নাম, উৎস বা লক্ষণ লিখুন"
+                                    autoFocus
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-[12rem]">
+                                  <label className={label}>ওষুধ</label>
+                                  <select
+                                    className={input}
+                                    value={pickRemedyId}
+                                    onChange={(e) => setPickRemedyId(e.target.value)}
+                                    disabled={pickOptions.length === 0}
+                                  >
+                                    <option value="">
+                                      {pickOptions.length === 0 ? 'কোনো ওষুধ মিলল না' : 'বেছে নিন…'}
+                                    </option>
+                                    {pickOptions.map(({ remedy: m }) => (
+                                      <option key={m.id} value={m.id}>{m.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="w-20">
+                                  <label className={label}>গ্রেড</label>
+                                  <select
+                                    className={input}
+                                    value={pickGrade}
+                                    onChange={(e) => setPickGrade(e.target.value)}
+                                  >
+                                    <option value={1}>১</option>
+                                    <option value={2}>২</option>
+                                    <option value={3}>৩</option>
+                                  </select>
+                                </div>
+                                <button
+                                  onClick={() => addRemedyToRubric(r.id)}
+                                  disabled={!pickRemedyId}
+                                  className="btn btn-primary btn-sm"
                                 >
-                                  <option value="">বেছে নিন…</option>
-                                  {linkableRemedies.map((m) => (
-                                    <option key={m.id} value={m.id}>{m.name}</option>
-                                  ))}
-                                </select>
+                                  যোগ
+                                </button>
                               </div>
-                              <div className="w-20">
-                                <label className={label}>গ্রেড</label>
-                                <select
-                                  className={input}
-                                  value={pickGrade}
-                                  onChange={(e) => setPickGrade(e.target.value)}
-                                >
-                                  <option value={1}>১</option>
-                                  <option value={2}>২</option>
-                                  <option value={3}>৩</option>
-                                </select>
-                              </div>
-                              <button
-                                onClick={() => addRemedyToRubric(r.id)}
-                                disabled={!pickRemedyId}
-                                className="btn btn-primary btn-sm"
-                              >
-                                যোগ
-                              </button>
+                              {pickQuery.trim() && (
+                                <p className="text-xs text-slate-500">
+                                  {pickSearch.items.length === 0
+                                    ? 'এই লেখায় কোনো ওষুধ মেলেনি — অন্য শব্দ দিয়ে দেখুন।'
+                                    : `${pickSearch.items.length}টি ওষুধ মিলেছে${pickSearch.partial ? ' (কাছাকাছি)' : ''}${pickSearch.items.length > 50 ? ' — প্রথম ৫০টি দেখানো হচ্ছে' : ''}`}
+                                </p>
+                              )}
                             </div>
                           )}
                         </div>
@@ -619,7 +811,15 @@ export default function Repertory() {
         </div>
       ))}
 
-      {filtered.length === 0 && <div className="card py-8 text-center text-sm text-slate-400">কোনো রুব্রিক পাওয়া যায়নি।</div>}
+      {filtered.length === 0 && (
+        <div className="card py-8 text-center text-sm text-slate-400">
+          {query.trim()
+            ? `“${query.trim()}” — কোনো রুব্রিক পাওয়া যায়নি। বানান বদলে বা কম শব্দ লিখে দেখুন।`
+            : customOnly
+              ? 'নিজের যোগ করা কোনো রুব্রিক পাওয়া যায়নি — ফিল্টার বন্ধ করে দেখুন।'
+              : 'কোনো রুব্রিক পাওয়া যায়নি।'}
+        </div>
+      )}
     </div>
   );
 }

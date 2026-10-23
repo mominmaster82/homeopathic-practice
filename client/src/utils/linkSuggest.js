@@ -1,27 +1,7 @@
 // ওষুধের কী-নোট/ক্লিনিক্যাল টেক্সটের সাথে রুব্রিকের টেক্সট মিলিয়ে
 // লিংকের প্রস্তাব তৈরি করে। প্রস্তাবগুলো কেবল সূত্র — ব্যবহারকারী যাচাই করে যোগ করবেন।
 
-const EN_STOP = new Set([
-  'with', 'from', 'that', 'this', 'these', 'those', 'have', 'has', 'had', 'into', 'upon',
-  'when', 'where', 'which', 'while', 'after', 'before', 'during', 'other', 'also', 'very',
-  'more', 'most', 'some', 'such', 'than', 'then', 'there', 'their', 'them', 'they', 'will',
-  'would', 'could', 'should', 'about', 'been', 'being', 'both', 'each', 'over', 'under',
-  'again', 'against', 'between', 'through', 'because', 'only', 'same', 'just', 'like',
-  'worse', 'better', 'amelioration', 'aggravation', 'symptom', 'symptoms',
-]);
-
-const BN_STOP = new Set([
-  'এবং', 'বা', 'ও', 'এর', 'এই', 'সেই', 'যে', 'যা', 'করে', 'হয়', 'হয়ে', 'হলে', 'হতে',
-  'থেকে', 'জন্য', 'সাথে', 'মধ্যে', 'উপর', 'নিচে', 'পরে', 'আগে', 'খুব', 'কম', 'বেশি', 'বেশ',
-  'একটি', 'একটা', 'কিছু', 'সব', 'না', 'নেই', 'আছে', 'মতো', 'দিকে', 'ধরনের', 'অনেক',
-  'তার', 'তাঁর', 'আমার', 'আপনার', 'একই', 'কিন্তু', 'তাই', 'সালে', 'দিন', 'সময়', 'রোগী',
-  'বাড়ে', 'বেড়ে', 'ভালো', 'কমে', 'শুরু', 'থাকে', 'লাগে', 'মনে', 'হলো', 'ওঠে', 'আসে',
-  'যায়', 'দেয়',
-  // রুব্রিকে ঘন ঘন আসা অথচ লক্ষণ-নির্দেশক নয় এমন শব্দ ("বমি ভাব", "ফেটে যাওয়ার মতো"):
-  // এগুলো বাদ না দিলে দুটি সাধারণ শব্দ মিলেই অপ্রাসঙ্গিক রুব্রিক প্রস্তাব হয়ে যায়।
-  // পুরো শব্দবন্ধ হুবহু মিললে (যেমন "বমি ভাব") তা এখনও ধরা পড়ে — শুধু আলাদা টোকেন হিসেবে বাদ যায়।
-  'ভাব', 'যাওয়া', 'যাওয়ার', 'দিয়ে', 'সহ',
-]);
+import { EN_STOP, BN_STOP, normalize, wordsOf, charLen, minStemLen, stemHit } from './textMatch.js';
 
 // এই স্কোরের নিচে মিল হলে প্রস্তাব দেখানো হয় না
 const MIN_SCORE = 2;
@@ -33,17 +13,6 @@ export function splitRubricPhrases(text) {
   const parts = m ? [m[1].trim(), m[2].trim()] : [raw];
   return parts.filter(Boolean);
 }
-
-const normalize = (text) =>
-  String(text ?? '')
-    .toLowerCase()
-    .replace(/[।,;:.!?()[\]{}"'“”‘’/\\|@#$%^&*+=~`<>_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const wordsOf = (text) => normalize(text).split(' ').filter(Boolean);
-
-const charLen = (t) => [...t].length;
 
 // মিল খোঁজার সময় সাধারণ/অর্থহীন শব্দ বাদ দিই
 function interestingWords(text) {
@@ -73,19 +42,6 @@ function remedyDoc(remedy) {
       words: new Set(wordsOf(value)),
     };
   });
-}
-
-// বাংলা শব্দ ছোট হলেও অর্থবহ ("হজম", "জিভ"), ইংরেজিতে ছোট শব্দ মিলিয়ে ভুল বাড়ে
-const minStemLen = (t) => (/^[a-z]+$/.test(t) ? 4 : 3);
-
-// "টনসিল" ↔ "টনসিলিটিস" / "হজম" ↔ "হজমের" — কাণ্ড-শব্দ মিলিয়ে দেখি
-function stemHit(words, token) {
-  if (charLen(token) < minStemLen(token)) return null;
-  for (const word of words) {
-    if (charLen(word) < minStemLen(word)) continue;
-    if (word === token || word.startsWith(token) || token.startsWith(word)) return word;
-  }
-  return null;
 }
 
 // আগে হুবহু মিল, না পেলে কাণ্ড-শব্দ মিল — মিললে শব্দটি ফেরায়, নইলে null

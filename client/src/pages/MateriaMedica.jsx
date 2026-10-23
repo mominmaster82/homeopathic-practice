@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api.js';
 import { suggestRubricsForRemedy } from '../utils/linkSuggest.js';
+import { searchRemedies } from '../utils/search.js';
 
 // গ্রেড দেখানোর জন্য তিনটি বিন্দু (● ● ●)
 function GradeDots({ grade }) {
@@ -99,6 +100,9 @@ export default function MateriaMedica() {
   const [remedies, setRemedies] = useState([]);
   const [query, setQuery] = useState('');
   const [letter, setLetter] = useState('সব');
+  const [customOnly, setCustomOnly] = useState(
+    () => localStorage.getItem('materia-custom-only') === '1'
+  );
   const [selected, setSelected] = useState(null); // নির্বাচিত ওষুধ
   const [profile, setProfile] = useState(null); // নির্বাচিত ওষুধের রুব্রিক-প্রোফাইল
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -124,6 +128,9 @@ export default function MateriaMedica() {
     loadRemedies();
     api.getSections().then(setSections).catch(() => {});
   }, []);
+  useEffect(() => {
+    localStorage.setItem('materia-custom-only', customOnly ? '1' : '0');
+  }, [customOnly]);
 
   // রেপার্টরি থেকে পাঠানো ফোকাস ওষুধ খুলে দেখাও
   useEffect(() => {
@@ -140,25 +147,32 @@ export default function MateriaMedica() {
 
   // উপলব্ধ বর্ণমালা (ওষুধের নামের প্রথম অক্ষর)
   const letters = useMemo(() => {
-    const set = new Set(remedies.map((r) => r.name[0].toUpperCase()));
+    const source = customOnly ? remedies.filter((r) => !!r.is_custom) : remedies;
+    const set = new Set(source.map((r) => r.name[0].toUpperCase()));
     return [...set].sort();
-  }, [remedies]);
+  }, [remedies, customOnly]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return remedies.filter((r) => {
-      const matchesLetter = letter === 'সব' || r.name[0].toUpperCase() === letter;
-      const matchesQuery =
-        !q ||
-        r.name.toLowerCase().includes(q) ||
-        (r.source || '').toLowerCase().includes(q) ||
-        (r.keynotes || '').toLowerCase().includes(q) ||
-        (r.clinical || '').toLowerCase().includes(q) ||
-        (r.better || '').toLowerCase().includes(q) ||
-        (r.worse || '').toLowerCase().includes(q);
-      return matchesLetter && matchesQuery;
-    });
-  }, [remedies, query, letter]);
+  const customCount = useMemo(() => remedies.filter((r) => !!r.is_custom).length, [remedies]);
+
+  // ফাজি সার্চ (নাম/উৎস/কী-নোট/ক্লিনিক্যাল/মোডালিটি), তারপর বর্ণ ফিল্টার
+  const remedySearch = useMemo(() => {
+    const pool = customOnly ? remedies.filter((r) => !!r.is_custom) : remedies;
+    return searchRemedies(pool, query);
+  }, [remedies, query, customOnly]);
+
+  const filtered = useMemo(
+    () =>
+      remedySearch.items
+        .map(({ remedy }) => remedy)
+        .filter((r) => letter === 'সব' || (r.name || '')[0]?.toUpperCase() === letter),
+    [remedySearch, letter]
+  );
+
+  const toggleCustomOnly = () => {
+    const next = !customOnly;
+    setCustomOnly(next);
+    if (next) setLetter('সব');
+  };
 
   // ওষুধের রুব্রিকগুলো সেকশন অনুযায়ী গোছানো
   const grouped = useMemo(() => {
@@ -264,6 +278,13 @@ export default function MateriaMedica() {
       await loadRemedies();
       setShowAddForm(false);
       await openRemedy(created);
+      setQuery('');
+      setLetter('সব');
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.getElementById(`remedy-${created.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      });
       setNotice({ text: `"${created.name}" যোগ করা হয়েছে — নিচে প্রস্তাবিত রুব্রিক দেখুন`, ok: true });
       loadRubricSuggestions(created, []);
     } catch (e) {
@@ -395,12 +416,33 @@ export default function MateriaMedica() {
         />
       )}
 
-      <input
-        className="input max-w-md"
-        placeholder="🔍 ওষুধ খুঁজুন (নাম, উৎস, কী-নোট, ক্লিনিক্যাল, ভালো/মন্দ)..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          className="input max-w-md"
+          placeholder="🔍 ওষুধ খুঁজুন (নাম, উৎস, কী-নোট, ক্লিনিক্যাল, ভালো/মন্দ)..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <button
+          type="button"
+          onClick={toggleCustomOnly}
+          aria-pressed={customOnly}
+          className={`px-3 py-1 rounded-full text-sm border transition ${
+            customOnly
+              ? 'bg-amber-500 text-white border-amber-500 shadow-soft'
+              : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50'
+          }`}
+        >
+          ✨ শুধু নিজের যোগ করা ({customCount})
+        </button>
+      </div>
+      {query.trim() && (
+        <p className="text-xs text-slate-500">
+          {filtered.length === 0
+            ? 'কোনো ওষুধ মেলেনি — বানান বদলে বা কম শব্দ লিখে দেখুন।'
+            : `${filtered.length}টি ওষুধ দেখানো হচ্ছে${remedySearch.partial ? ' (কাছাকাছি)' : ''}`}
+        </p>
+      )}
 
       {/* বর্ণমালা ইনডেক্স */}
       <div className="flex flex-wrap gap-1 rounded-xl border border-slate-100 bg-slate-50 p-2">
@@ -425,6 +467,7 @@ export default function MateriaMedica() {
           {filtered.map((r) => (
             <button
               key={r.id}
+              id={`remedy-${r.id}`}
               onClick={() => openRemedy(r)}
               className={`w-full text-left px-3 py-2 rounded-lg transition ${
                 selected?.id === r.id ? 'bg-teal-50 ring-1 ring-inset ring-teal-200' : 'hover:bg-slate-50'
@@ -442,7 +485,15 @@ export default function MateriaMedica() {
             </button>
           ))}
           {filtered.length === 0 && (
-            <div className="py-8 text-center text-sm text-slate-400">কিছু পাওয়া যায়নি।</div>
+            <div className="py-8 text-center text-sm text-slate-400">
+              {query.trim()
+                ? 'কোনো ওষুধ মেলেনি — বানান বদলে বা কম শব্দ লিখে দেখুন।'
+                : customOnly
+                  ? 'নিজের যোগ করা কোনো ওষুধ নেই — ফিল্টার বন্ধ করে দেখুন।'
+                  : remedySearch.items.length > 0
+                    ? 'এই অক্ষরে কোনো ওষুধ নেই — "সব" বেছে নিন।'
+                    : 'কিছু পাওয়া যায়নি।'}
+            </div>
           )}
         </div>
 

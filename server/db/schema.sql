@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS remedies (
 CREATE TABLE IF NOT EXISTS rubrics (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   section TEXT NOT NULL,
-  rubric_text TEXT NOT NULL
+  rubric_text TEXT NOT NULL,
+  is_custom INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS rubric_remedies (
