@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import { suggestRubricsForRemedy } from '../utils/linkSuggest.js';
 import { searchRemedies } from '../utils/search.js';
 
@@ -97,6 +98,7 @@ function RemedyForm({ initial, onSubmit, onCancel, submitLabel }) {
 export default function MateriaMedica() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isAdmin } = useAuth();
   const [remedies, setRemedies] = useState([]);
   const [query, setQuery] = useState('');
   const [letter, setLetter] = useState('সব');
@@ -389,15 +391,18 @@ export default function MateriaMedica() {
         <div>
           <h2 className="page-title">ম্যাটেরিয়া মেডিকা</h2>
           <p className="page-sub">
-            ওষুধ বেছে নিয়ে তার কী-নোট ও রেপার্টরি প্রোফাইল দেখুন — নতুন ওষুধ যোগ করলে টেক্সট-মিলে পাওয়া রুব্রিকের প্রস্তাব স্বয়ংক্রিয়ভাবে দেখাবে।
+            ওষুধ বেছে নিয়ে তার কী-নোট, ক্লিনিক্যাল ব্যবহার ও রেপার্টরি প্রোফাইল দেখুন
+            {isAdmin ? ' — নতুন ওষুধ যোগ করলে টেক্সট-মিলে পাওয়া রুব্রিকের প্রস্তাব স্বয়ংক্রিয়ভাবে দেখাবে।' : '।'}
           </p>
         </div>
-        <button
-          onClick={() => { setShowAddForm((v) => !v); setNotice(null); }}
-          className="btn btn-primary"
-        >
-          {showAddForm ? '✕ বন্ধ করুন' : '＋ নতুন ওষুধ যোগ করুন'}
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => { setShowAddForm((v) => !v); setNotice(null); }}
+            className="btn btn-primary"
+          >
+            {showAddForm ? '✕ বন্ধ করুন' : '＋ নতুন ওষুধ যোগ করুন'}
+          </button>
+        )}
       </div>
 
       {msg && <div className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">{msg}</div>}
@@ -407,7 +412,7 @@ export default function MateriaMedica() {
         </div>
       )}
 
-      {showAddForm && (
+      {isAdmin && showAddForm && (
         <RemedyForm
           initial={EMPTY_FORM}
           onSubmit={submitAdd}
@@ -505,7 +510,7 @@ export default function MateriaMedica() {
             </div>
           )}
 
-          {selected && editing && (
+          {selected && isAdmin && editing && (
             <div className="card p-5 space-y-3">
               <h3 className="text-lg font-bold text-slate-800">সম্পাদনা: {selected.name}</h3>
               <RemedyForm
@@ -538,22 +543,24 @@ export default function MateriaMedica() {
                   </h3>
                   <p className="text-sm text-slate-500 italic">উৎস: {selected.source}</p>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => { setEditing(true); setNotice(null); }}
-                    className="btn btn-ghost btn-sm"
-                  >
-                    ✎ সম্পাদনা
-                  </button>
-                  {!!selected.is_custom && (
+                {isAdmin && (
+                  <div className="flex gap-2">
                     <button
-                      onClick={removeRemedy}
-                      className="btn btn-danger btn-sm"
+                      onClick={() => { setEditing(true); setNotice(null); }}
+                      className="btn btn-ghost btn-sm"
                     >
-                      🗑 মুছুন
+                      ✎ সম্পাদনা
                     </button>
-                  )}
-                </div>
+                    {!!selected.is_custom && (
+                      <button
+                        onClick={removeRemedy}
+                        className="btn btn-danger btn-sm"
+                      >
+                        🗑 মুছুন
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="rounded-lg border border-teal-100 bg-teal-50 p-3">
@@ -590,23 +597,27 @@ export default function MateriaMedica() {
                         {profile.length} রুব্রিকে আছে · গ্রেড <GradeDots grade={3} /> = শক্তিশালী
                       </span>
                     )}
-                    <button
-                      onClick={toggleSuggestions}
-                      disabled={suggestBusy || loadingProfile}
-                      className="btn btn-sm border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50"
-                    >
-                      {suggestBusy ? '⟳ খোঁজা হচ্ছে…' : suggestions ? '✕ প্রস্তাব বন্ধ' : '✨ প্রস্তাবিত রুব্রিক'}
-                    </button>
-                    <button
-                      onClick={() => setShowLinkPicker((v) => !v)}
-                      className="btn btn-sm border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
-                    >
-                      {showLinkPicker ? '✕ বন্ধ' : '＋ রুব্রিক যোগ'}
-                    </button>
+                    {isAdmin && (
+                      <>
+                        <button
+                          onClick={toggleSuggestions}
+                          disabled={suggestBusy || loadingProfile}
+                          className="btn btn-sm border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                        >
+                          {suggestBusy ? '⟳ খোঁজা হচ্ছে…' : suggestions ? '✕ প্রস্তাব বন্ধ' : '✨ প্রস্তাবিত রুব্রিক'}
+                        </button>
+                        <button
+                          onClick={() => setShowLinkPicker((v) => !v)}
+                          className="btn btn-sm border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
+                        >
+                          {showLinkPicker ? '✕ বন্ধ' : '＋ রুব্রিক যোগ'}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                {showLinkPicker && (
+                {isAdmin && showLinkPicker && (
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 mb-3 grid sm:grid-cols-4 gap-2 items-end">
                     <div>
                       <label className={label}>সেকশন</label>
@@ -648,7 +659,7 @@ export default function MateriaMedica() {
 
                 {loadingProfile && <div className="py-2 text-sm text-slate-400">লোড হচ্ছে…</div>}
 
-                {suggestions && (
+                {isAdmin && suggestions && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 mb-3 space-y-2">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
@@ -712,7 +723,9 @@ export default function MateriaMedica() {
 
                 {!loadingProfile && grouped.length === 0 && profile && (
                   <div className="py-8 text-center text-sm text-slate-400">
-                    এই ওষুধটির জন্য কোনো রুব্রিক লিংক নেই — "✨ প্রস্তাবিত রুব্রিক" দেখুন বা "＋ রুব্রিক যোগ" দিয়ে নিজে বেছে নিন।
+                    {isAdmin
+                      ? 'এই ওষুধটির জন্য কোনো রুব্রিক লিংক নেই — "✨ প্রস্তাবিত রুব্রিক" দেখুন বা "＋ রুব্রিক যোগ" দিয়ে নিজে বেছে নিন।'
+                      : 'এই ওষুধটির জন্য এখনো কোনো রেপার্টরি রুব্রিক যুক্ত হয়নি।'}
                   </div>
                 )}
 
@@ -734,23 +747,27 @@ export default function MateriaMedica() {
                               <span className="flex-1">{row.rubric_text}</span>
                               <span className="text-slate-300 group-hover:text-teal-400">↗</span>
                             </button>
-                            <select
-                              className="text-xs border border-slate-200 rounded px-1 py-0.5 text-slate-500 bg-white opacity-0 group-hover:opacity-100 focus:opacity-100"
-                              value={row.grade}
-                              title="গ্রেড পরিবর্তন"
-                              onChange={(e) => changeGrade(row, e.target.value)}
-                            >
-                              <option value={1}>১</option>
-                              <option value={2}>২</option>
-                              <option value={3}>৩</option>
-                            </select>
-                            <button
-                              onClick={() => removeLink(row)}
-                              title="এই রুব্রিক লিংক মুছুন"
-                              className="text-xs text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 px-1"
-                            >
-                              ✕
-                            </button>
+                            {isAdmin && (
+                              <>
+                                <select
+                                  className="text-xs border border-slate-200 rounded px-1 py-0.5 text-slate-500 bg-white opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                  value={row.grade}
+                                  title="গ্রেড পরিবর্তন"
+                                  onChange={(e) => changeGrade(row, e.target.value)}
+                                >
+                                  <option value={1}>১</option>
+                                  <option value={2}>২</option>
+                                  <option value={3}>৩</option>
+                                </select>
+                                <button
+                                  onClick={() => removeLink(row)}
+                                  title="এই রুব্রিক লিংক মুছুন"
+                                  className="text-xs text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 px-1"
+                                >
+                                  ✕
+                                </button>
+                              </>
+                            )}
                           </li>
                         ))}
                       </ul>

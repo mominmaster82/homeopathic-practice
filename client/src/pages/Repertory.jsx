@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import { suggestRemediesForRubric } from '../utils/linkSuggest.js';
 import { searchRubrics, searchRemedies, highlightSegments } from '../utils/search.js';
 
@@ -77,6 +78,7 @@ function RubricForm({ initial, sections, onSubmit, onCancel, submitLabel }) {
 export default function Repertory() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isAdmin } = useAuth();
   const [sections, setSections] = useState([]);
   const [section, setSection] = useState('');
   const [rubrics, setRubrics] = useState([]);
@@ -409,21 +411,23 @@ export default function Repertory() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="page-title">রেপার্টরি</h2>
-        <div className="flex gap-2">
-          <button
-            onClick={() => { setShowAddForm((v) => !v); setNotice(null); }}
-            className="btn btn-ghost"
-          >
-            {showAddForm ? '✕ বন্ধ করুন' : '＋ নতুন রুব্রিক'}
-          </button>
-          <button
-            onClick={goToAnalysis}
-            disabled={selected.length === 0}
-            className="btn btn-primary"
-          >
-            বিশ্লেষণে পাঠান ({selected.length})
-          </button>
-        </div>
+        {isAdmin && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setShowAddForm((v) => !v); setNotice(null); }}
+              className="btn btn-ghost"
+            >
+              {showAddForm ? '✕ বন্ধ করুন' : '＋ নতুন রুব্রিক'}
+            </button>
+            <button
+              onClick={goToAnalysis}
+              disabled={selected.length === 0}
+              className="btn btn-primary"
+            >
+              বিশ্লেষণে পাঠান ({selected.length})
+            </button>
+          </div>
+        )}
       </div>
 
       {notice && (
@@ -432,7 +436,7 @@ export default function Repertory() {
         </div>
       )}
 
-      {showAddForm && (
+      {isAdmin && showAddForm && (
         <RubricForm
           initial={EMPTY_FORM}
           sections={sections}
@@ -536,7 +540,7 @@ export default function Repertory() {
         ))}
       </div>
 
-      {selected.length > 0 && (
+      {isAdmin && selected.length > 0 && (
         <div className="text-sm text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
           নির্বাচিত: {selected.length}টি রুব্রিক
           <button onClick={() => setSelected([])} className="ml-2 underline hover:text-teal-800">মুছুন</button>
@@ -555,7 +559,7 @@ export default function Repertory() {
           <div className="divide-y divide-slate-100">
             {items.map(({ rubric: r, matchedWords }) => (
               <div key={r.id} id={`rubric-${r.id}`} className="px-4 py-2.5 hover:bg-slate-50/60 transition-colors">
-                {editingId === r.id ? (
+                {isAdmin && editingId === r.id ? (
                   <RubricForm
                     initial={{ section: r.section, rubric_text: r.rubric_text }}
                     sections={sections}
@@ -570,13 +574,15 @@ export default function Repertory() {
                         r.id === focusId ? 'bg-teal-50 -mx-4 px-4 py-1 ring-1 ring-inset ring-teal-400' : ''
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        className="mt-1 h-4 w-4 rounded border-slate-300 accent-teal-600"
-                        checked={selected.includes(r.id)}
-                        onChange={() => toggleSelect(r.id)}
-                        title="বিশ্লেষণের জন্য নির্বাচন"
-                      />
+                      {isAdmin && (
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 rounded border-slate-300 accent-teal-600"
+                          checked={selected.includes(r.id)}
+                          onChange={() => toggleSelect(r.id)}
+                          title="বিশ্লেষণের জন্য নির্বাচন"
+                        />
+                      )}
                       <button
                         onClick={() => openRubric(r.id)}
                         className="flex-1 text-left text-sm font-medium text-slate-700 hover:text-teal-700 flex justify-between items-center gap-2"
@@ -591,21 +597,25 @@ export default function Repertory() {
                         </span>
                         <span className="text-slate-400 ml-2 shrink-0">{open === r.id ? '−' : '+'}</span>
                       </button>
-                      <button
-                        onClick={() => { setEditingId(r.id); setNotice(null); }}
-                        title="রুব্রিক সম্পাদনা"
-                        className="text-xs text-slate-400 hover:text-teal-600 px-1 mt-1"
-                      >
-                        ✎
-                      </button>
-                      {!!r.is_custom && (
-                        <button
-                          onClick={() => removeRubric(r)}
-                          title="রুব্রিক মুছুন"
-                          className="text-xs text-slate-400 hover:text-red-500 px-1 mt-1"
-                        >
-                          🗑
-                        </button>
+                      {isAdmin && (
+                        <>
+                          <button
+                            onClick={() => { setEditingId(r.id); setNotice(null); }}
+                            title="রুব্রিক সম্পাদনা"
+                            className="text-xs text-slate-400 hover:text-teal-600 px-1 mt-1"
+                          >
+                            ✎
+                          </button>
+                          {!!r.is_custom && (
+                            <button
+                              onClick={() => removeRubric(r)}
+                              title="রুব্রিক মুছুন"
+                              className="text-xs text-slate-400 hover:text-red-500 px-1 mt-1"
+                            >
+                              🗑
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
 
@@ -624,23 +634,31 @@ export default function Repertory() {
                               >
                                 {m.name} ↗
                               </button>
-                              <select
-                                className="text-xs border border-amber-200 rounded px-1 py-0.5 text-slate-500 bg-white"
-                                value={m.grade}
-                                title="গ্রেড পরিবর্তন"
-                                onChange={(e) => changeGrade(r.id, m.id, e.target.value)}
-                              >
-                                <option value={1}>১</option>
-                                <option value={2}>২</option>
-                                <option value={3}>৩</option>
-                              </select>
-                              <button
-                                onClick={() => removeRemedyLink(r.id, m)}
-                                title="এই ওষুধ-লিংক মুছুন"
-                                className="text-xs text-amber-300 hover:text-red-500 px-0.5"
-                              >
-                                ✕
-                              </button>
+                              {isAdmin ? (
+                                <>
+                                  <select
+                                    className="text-xs border border-amber-200 rounded px-1 py-0.5 text-slate-500 bg-white"
+                                    value={m.grade}
+                                    title="গ্রেড পরিবর্তন"
+                                    onChange={(e) => changeGrade(r.id, m.id, e.target.value)}
+                                  >
+                                    <option value={1}>১</option>
+                                    <option value={2}>২</option>
+                                    <option value={3}>৩</option>
+                                  </select>
+                                  <button
+                                    onClick={() => removeRemedyLink(r.id, m)}
+                                    title="এই ওষুধ-লিংক মুছুন"
+                                    className="text-xs text-amber-300 hover:text-red-500 px-0.5"
+                                  >
+                                    ✕
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-[11px] text-amber-700" title="গ্রেড">
+                                  গ্রেড {m.grade}
+                                </span>
+                              )}
                             </span>
                           ))}
                           {remedies.length === 0 && (
@@ -648,6 +666,7 @@ export default function Repertory() {
                           )}
                         </div>
 
+                        {isAdmin && (
                         <div className="space-y-2">
                           <div className="flex flex-wrap gap-2">
                             <button
@@ -801,6 +820,7 @@ export default function Repertory() {
                             </div>
                           )}
                         </div>
+                        )}
                       </div>
                     )}
                   </>

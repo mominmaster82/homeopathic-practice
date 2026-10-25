@@ -1,11 +1,65 @@
 rules_version = '2';
 
-// একক-অ্যাডমিন অ্যাপ: শুধুমাত্র লগইন-করা (Firebase Auth) ব্যবহারকারী
-// Firestore পড়তে/লিখতে পারবেন। অলগিন অবস্থায় সব অ্যাক্সেস বন্ধ।
+// ভূমিকা (users/{uid} ডকুমেন্টে role + status):
+//   super_admin → সব ডেটা পড়া/লেখা; রোগী, কেস, প্রেসক্রিপশন, কাউন্টার, ইউজার ব্যবস্থাপনা
+//   subscriber  → শুধু রেফারেন্স (রেপার্টরি/ম্যাটেরিয়া) পড়া; কোনো লেখা নেই
+// status != 'active' হলে (pending/suspended) কিছুই পড়া/লেখা যায় না।
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    function signedIn() {
+      return request.auth != null;
     }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function activeUser() {
+      return signedIn() && profile().status == 'active';
+    }
+
+    function adminUser() {
+      return activeUser() && profile().role == 'super_admin';
+    }
+
+    // নিজের প্রোফাইল পড়া যায়; তালিকা/তৈরি/পরিবর্তন শুধু অ্যাডমিন
+    match /users/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, create, update, delete: if adminUser();
+    }
+
+    // রেফারেন্স ডেটা — সক্রিয় ইউজার পড়বে, শুধু অ্যাডমিন লিখবে
+    match /remedies/{id} {
+      allow read: if activeUser();
+      allow write: if adminUser();
+    }
+    match /rubrics/{id} {
+      allow read: if activeUser();
+      allow write: if adminUser();
+    }
+    match /rubric_links/{id} {
+      allow read: if activeUser();
+      allow write: if adminUser();
+    }
+    match /settings/{id} {
+      allow read: if activeUser();
+      allow write: if adminUser();
+    }
+
+    // রোগীর গোপনীয় ডেটা — সম্পূর্ণ অ্যাডমিন-সীমিত
+    match /patients/{id} {
+      allow read, write: if adminUser();
+    }
+    match /cases/{id} {
+      allow read, write: if adminUser();
+    }
+    match /prescriptions/{id} {
+      allow read, write: if adminUser();
+    }
+    match /counters/{id} {
+      allow read, write: if adminUser();
+    }
+
+    // অজানা যেকোনো কালেকশন ডিফল্টভাবে বন্ধ
   }
 }

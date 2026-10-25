@@ -927,6 +927,14 @@ const authApi = {
 
   subscribeAuth: (cb) => onAuthStateChanged(auth, cb),
 
+  // users/{uid} — role/status; ডকুমেন্ট না থাকলে null (অ্যাক্সেস দেওয়া হয়নি)
+  getUserProfile: async (uid) => {
+    const id = String(uid || '').trim();
+    if (!id) return null;
+    const snap = await getDoc(doc(db, 'users', id));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  },
+
   changePassword: async (currentPassword, newPassword) => {
     const user = auth.currentUser;
     if (!user) throw new Error('আগে লগইন করুন');
@@ -949,18 +957,19 @@ const authApi = {
 
 // ---------- অফলাইন প্রি-ক্যাশ ----------
 
-// সব রেফারেন্স + ইউজার ডেটা একবার পড়লে Firestore-এর IndexedDB ক্যাশে জমা হয়,
-// ফলে ইন্টারনেট না থাকলেও এই ডেটা পড়া/লেখা চলে এবং বিশ্লেষণও কাজ করে।
-async function preloadForOffline() {
-  await Promise.all([
+// রেফারেন্স ডেটা সব সক্রিয় ইউজারের জন্য ক্যাশে নামে; রোগী/কেস শুধু অ্যাডমিনের।
+// এতে ইন্টারনেট না থাকলেও পড়া/লেখা চলে এবং বিশ্লেষণও কাজ করে।
+async function preloadForOffline({ includePrivate = false } = {}) {
+  const jobs = [
     allDocs('remedies'),
     allDocs('rubrics'),
     allDocs('rubric_links'),
-    allDocs('patients'),
-    allDocs('cases'),
-    allDocs('prescriptions'),
     getDoc(doc(db, 'settings', 'clinic')),
-  ]);
+  ];
+  if (includePrivate) {
+    jobs.push(allDocs('patients'), allDocs('cases'), allDocs('prescriptions'));
+  }
+  await Promise.all(jobs);
   return { ok: true };
 }
 
