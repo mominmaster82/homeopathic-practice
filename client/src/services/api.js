@@ -15,6 +15,7 @@ import {
   writeBatch,
   getCountFromServer,
 } from 'firebase/firestore';
+import { initializeApp, deleteApp } from 'firebase/app';
 import {
   signInWithEmailAndPassword,
   signOut,
@@ -22,8 +23,11 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
   updatePassword,
+  getAuth,
+  createUserWithEmailAndPassword,
+  signOut as signOutSecondary,
 } from 'firebase/auth';
-import { db, auth } from '../firebase.js';
+import { firebaseConfig, db, auth } from '../firebase.js';
 
 // ---------- সাধারণ হেল্পার ----------
 
@@ -955,6 +959,137 @@ const authApi = {
   },
 };
 
+// ---------- ইউজার ব্যবস্থাপনা (সুপার অ্যাডমিন) ----------
+
+const USER_ROLES = ['super_admin', 'subscriber'];
+const USER_STATUSES = ['active', 'suspended'];
+
+function userError(err) {
+  const code = err?.code || '';
+  if (code === 'auth/email-already-in-use') {
+    return new Error('এই ইমেইলে আগে থেকেই একটি অ্যাকাউন্ট আছে');
+  }
+  if (code === 'auth/invalid-email') return new Error('ইমেইল সঠিক নয়');
+  if (code === 'auth/weak-password') {
+    return new Error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে');
+  }
+  if (code === 'auth/operation-not-allowed') {
+    return new Error('Firebase Authentication-এ Email/Password সাইন-ইন চালু নেই');
+  }
+  if (code === 'permission-denied') {
+    return new Error('অনুমতি নেই — সুপার অ্যাডমিন হিসেবে লগইন করুন');
+  }
+  if (code === 'auth/network-request-failed') {
+    return new Error('নেটওয়ার্ক সমস্যা — ইন্টারনেট চেক করুন');
+  }
+  return err;
+}
+
+const usersApi = {
+  listUsers: async () => {
+    const snap = await getDocs(collection(db, 'users'));
+    const me = auth.currentUser;
+    return snap.docs
+      .map((d) => {
+        const row = { id: d.id, ...d.data() };
+        if (me && d.id === me.uid && !row.email) row.email = me.email || '';
+        return row;
+      })
+      .sort((a, b) =>
+        String(a.name || a.email || '')
+          .toLowerCase()
+          .localeCompare(String(b.name || b.email || '').toLowerCase())
+      );
+  },
+
+  // Auth ইউজার আলাদা অ্যাপে তৈরি হয় — অ্যাডমিনের নিজের সেশন লগআউট হয় না।
+  createUserAccount: async ({ name, email, password, role = 'subscriber', status = 'active' }) => {
+    const cleanName = String(name || '').trim();
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanPassword = String(password || '');
+    if (!cleanEmail) throw new Error('ইমেইল দিতে হবে');
+    if (cleanPassword.length < 6) throw new Error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে');
+    if (!USER_ROLES.includes(role)) throw new Error('রোল সঠিক নয়');
+    if (!USER_STATUSES.includes(status)) throw new Error('স্ট্যাটাস সঠিক নয়');
+
+    const secondaryApp = initializeApp(firebaseConfig, `user-create-${Date.now()}`);
+    const secondaryAuth = getAuth(secondaryApp);
+    let created = null;
+    try {
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, cleanEmail, cleanPassword);
+      created = cred.user;
+      await setDoc(doc(db, 'users', created.uid), {
+        name: cleanName || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        role,
+        status,
+        created_at: now(),
+        created_by: auth.currentUser?.uid || null,
+      });
+      return { id: created.uid, email: cleanEmail };
+    } catch (err) {
+      // প্রোফাইল লেখা ব্যর্থ হলে Auth ইউজারটি এতিম থাকে যেন না
+      if (created) {
+        try {
+          await created.delete();
+        } catch {
+          /* ignore */
+        }
+      }
+      throw userError(err);
+    } finally {
+      try {
+        await signOutSecondary(secondaryAuth);
+      } catch {
+        /* ignore */
+      }
+      try {
+        await deleteApp(secondaryApp);
+      } catch {
+        /* ignore */
+      }
+    }
+  },
+
+  updateUserAccess: async (uid, { role, status }) => {
+    const id = String(uid || '').trim();
+    if (!id) throw new Error('ইউজার আইডি নেই');
+    if (auth.currentUser?.uid === id) {
+      throw new Error('নিজের অ্যাকাউন্টের রোল বা স্ট্যাটাস বদলানো যাবে না');
+    }
+    const patch = {};
+    if (role !== undefined) {
+      if (!USER_ROLES.includes(role)) throw new Error('রোল সঠিক নয়');
+      patch.role = role;
+    }
+    if (status !== undefined) {
+      if (!USER_STATUSES.includes(status)) throw new Error('স্ট্যাটাস সঠিক নয়');
+      patch.status = status;
+    }
+    if (!Object.keys(patch).length) throw new Error('কোনো পরিবর্তন নেই');
+    patch.updated_at = now();
+    try {
+      await updateDoc(doc(db, 'users', id), patch);
+      return { ok: true };
+    } catch (err) {
+      throw userError(err);
+    }
+  },
+
+  // শুধু প্রোফাইল মুছে অ্যাক্সেস বাতিল হয় — Auth অ্যাকাউন্ট ক্লায়েন্ট থেকে মোছা যায় না
+  deleteUserAccess: async (uid) => {
+    const id = String(uid || '').trim();
+    if (!id) throw new Error('ইউজার আইডি নেই');
+    if (auth.currentUser?.uid === id) throw new Error('নিজের অ্যাকাউন্ট মুছে ফেলা যাবে না');
+    try {
+      await deleteDoc(doc(db, 'users', id));
+      return { ok: true };
+    } catch (err) {
+      throw userError(err);
+    }
+  },
+};
+
 // ---------- অফলাইন প্রি-ক্যাশ ----------
 
 // রেফারেন্স ডেটা সব সক্রিয় ইউজারের জন্য ক্যাশে নামে; রোগী/কেস শুধু অ্যাডমিনের।
@@ -984,5 +1119,6 @@ export const api = {
   ...settingsApi,
   ...backupApi,
   ...authApi,
+  ...usersApi,
   preloadForOffline,
 };

@@ -7,7 +7,7 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: 'AIzaSyDxwDx4C_gHP1q-dL00drlWGXQZUM6MnNQ',
   authDomain: 'homeopathy-clinic-7f4e0.firebaseapp.com',
   projectId: 'homeopathy-clinic-7f4e0',

@@ -411,23 +411,23 @@ export default function Repertory() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="page-title">রেপার্টরি</h2>
-        {isAdmin && (
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          {isAdmin && (
             <button
               onClick={() => { setShowAddForm((v) => !v); setNotice(null); }}
               className="btn btn-ghost"
             >
               {showAddForm ? '✕ বন্ধ করুন' : '＋ নতুন রুব্রিক'}
             </button>
-            <button
-              onClick={goToAnalysis}
-              disabled={selected.length === 0}
-              className="btn btn-primary"
-            >
-              বিশ্লেষণে পাঠান ({selected.length})
-            </button>
-          </div>
-        )}
+          )}
+          <button
+            onClick={goToAnalysis}
+            disabled={selected.length === 0}
+            className="btn btn-primary"
+          >
+            বিশ্লেষণে পাঠান ({selected.length})
+          </button>
+        </div>
       </div>
 
       {notice && (
@@ -540,7 +540,7 @@ export default function Repertory() {
         ))}
       </div>
 
-      {isAdmin && selected.length > 0 && (
+      {selected.length > 0 && (
         <div className="text-sm text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
           নির্বাচিত: {selected.length}টি রুব্রিক
           <button onClick={() => setSelected([])} className="ml-2 underline hover:text-teal-800">মুছুন</button>
@@ -574,15 +574,13 @@ export default function Repertory() {
                         r.id === focusId ? 'bg-teal-50 -mx-4 px-4 py-1 ring-1 ring-inset ring-teal-400' : ''
                       }`}
                     >
-                      {isAdmin && (
-                        <input
-                          type="checkbox"
-                          className="mt-1 h-4 w-4 rounded border-slate-300 accent-teal-600"
-                          checked={selected.includes(r.id)}
-                          onChange={() => toggleSelect(r.id)}
-                          title="বিশ্লেষণের জন্য নির্বাচন"
-                        />
-                      )}
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 rounded border-slate-300 accent-teal-600"
+                        checked={selected.includes(r.id)}
+                        onChange={() => toggleSelect(r.id)}
+                        title="বিশ্লেষণের জন্য নির্বাচন"
+                      />
                       <button
                         onClick={() => openRubric(r.id)}
                         className="flex-1 text-left text-sm font-medium text-slate-700 hover:text-teal-700 flex justify-between items-center gap-2"

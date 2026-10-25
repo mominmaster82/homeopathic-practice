@@ -9,6 +9,7 @@ import MateriaMedica from './pages/MateriaMedica.jsx';
 import Analysis from './pages/Analysis.jsx';
 import PrescriptionPrint from './pages/PrescriptionPrint.jsx';
 import Settings from './pages/Settings.jsx';
+import Users from './pages/Users.jsx';
 import Login from './pages/Login.jsx';
 
 const navItem = ({ isActive }) =>
@@ -124,9 +125,10 @@ function AppContent() {
                 )}
                 <NavLink to="/repertory" className={navItem}>রেপার্টরি</NavLink>
                 <NavLink to="/materia" className={navItem}>ম্যাটেরিয়া মেডিকা</NavLink>
+                <NavLink to="/analysis" className={navItem}>বিশ্লেষণ</NavLink>
                 {isAdmin && (
                   <>
-                    <NavLink to="/analysis" className={navItem}>বিশ্লেষণ</NavLink>
+                    <NavLink to="/users" className={navItem}>ইউজার</NavLink>
                     <NavLink to="/settings" className={navItem}>⚙ সেটিংস</NavLink>
                   </>
                 )}
@@ -162,7 +164,8 @@ function AppContent() {
           <Route path="/case" element={<ProtectedRoute><AdminRoute><CaseTaking /></AdminRoute></ProtectedRoute>} />
           <Route path="/repertory" element={<ProtectedRoute><Repertory /></ProtectedRoute>} />
           <Route path="/materia" element={<ProtectedRoute><MateriaMedica /></ProtectedRoute>} />
-          <Route path="/analysis" element={<ProtectedRoute><AdminRoute><Analysis /></AdminRoute></ProtectedRoute>} />
+          <Route path="/analysis" element={<ProtectedRoute><Analysis /></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute><AdminRoute><Users /></AdminRoute></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><AdminRoute><Settings /></AdminRoute></ProtectedRoute>} />
           <Route path="/print/:caseId" element={<ProtectedRoute><AdminRoute><PrescriptionPrint /></AdminRoute></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />

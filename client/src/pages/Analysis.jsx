@@ -1,9 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api } from '../services/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Analysis() {
   const location = useLocation();
+  const { isAdmin } = useAuth();
   const [rubrics, setRubrics] = useState([]);
   const [selected, setSelected] = useState([]);
   const [results, setResults] = useState(null);
@@ -21,13 +23,17 @@ export default function Analysis() {
 
   useEffect(() => {
     api.getRubrics().then(setRubrics).catch((e) => setMsg(e.message));
-    api.getPatients().then(setPatients).catch(() => {});
-  }, []);
+    if (isAdmin) {
+      api.getPatients().then(setPatients).catch(() => {});
+    } else {
+      setPatients([]);
+    }
+  }, [isAdmin]);
 
   useEffect(() => {
-    if (!rxForm.patient_id) { setPatientCases([]); return; }
+    if (!isAdmin || !rxForm.patient_id) { setPatientCases([]); return; }
     api.getCases(rxForm.patient_id).then(setPatientCases).catch(() => {});
-  }, [rxForm.patient_id]);
+  }, [isAdmin, rxForm.patient_id]);
 
   // রেপার্টরি থেকে পাঠানো রুব্রিক গ্রহণ
   useEffect(() => {
@@ -53,6 +59,7 @@ export default function Analysis() {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
   const openRx = (remedy) => {
+    if (!isAdmin) return;
     setRx(remedy);
     setRxForm({ patient_id: '', case_id: 'new', potency: '30C', dose: '' });
   };
@@ -100,6 +107,12 @@ export default function Analysis() {
           রোগীর লক্ষণ অনুযায়ী রুব্রিক বেছে নিন, অথবা রেপার্টরি থেকে পাঠান।
         </p>
       </div>
+
+      {!isAdmin && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 px-4 py-2.5 rounded-lg">
+          বিশ্লেষণ সবার জন্য খোলা। প্রেসক্রিপশন সেভ শুধু সুপার অ্যাডমিন করতে পারেন।
+        </div>
+      )}
 
       {msg && (
         <div className="text-sm text-red-700 bg-red-50 border border-red-200 px-4 py-2.5 rounded-lg">{msg}</div>
@@ -178,13 +191,15 @@ export default function Analysis() {
                         />
                       </span>
                     </button>
-                    <button
-                      onClick={() => openRx(r)}
-                      title="প্রেসক্রিপশনে যোগ করো"
-                      className="px-3.5 text-amber-600 hover:bg-amber-50 border-l border-slate-100"
-                    >
-                      💊
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => openRx(r)}
+                        title="প্রেসক্রিপশনে যোগ করো"
+                        className="px-3.5 text-amber-600 hover:bg-amber-50 border-l border-slate-100"
+                      >
+                        💊
+                      </button>
+                    )}
                   </div>
 
                   {expanded === r.remedy_id && (
@@ -196,7 +211,7 @@ export default function Analysis() {
                     </div>
                   )}
 
-                  {rx?.remedy_id === r.remedy_id && (
+                  {isAdmin && rx?.remedy_id === r.remedy_id && (
                     <div className="px-4 py-3.5 border-t border-slate-100 bg-amber-50/70 space-y-3">
                       <div className="text-sm font-semibold text-slate-700">
                         💊 {r.name} প্রেসক্রাইব করুন
