@@ -1,9 +1,9 @@
 rules_version = '2';
 
 // ভূমিকা (users/{uid} ডকুমেন্টে role + status):
-//   super_admin → সব ডেটা পড়া/লেখা; রোগী, কেস, প্রেসক্রিপশন, কাউন্টার, ইউজার ব্যবস্থাপনা
-//   subscriber  → শুধু রেফারেন্স (রেপার্টরি/ম্যাটেরিয়া) পড়া; কোনো লেখা নেই
-// status != 'active' হলে (pending/suspended) কিছুই পড়া/লেখা যায় না।
+//   super_admin → সব ডেটা পড়া/লেখা; মেয়াদসীমা নেই; রোগী, কেস, প্রেসক্রিপশন, কাউন্টার, ইউজার ব্যবস্থাপনা
+//   subscriber  → শুধু রেফারেন্স (রেপার্টরি/ম্যাটেরিয়া) পড়া; expires_at টাইমস্ট্যাম্প ভবিষ্যতে থাকতে হবে
+// status != 'active' হলে (pending/suspended) বা সাবস্ক্রিপশনের মেয়াদ শেষ হলে কিছুই পড়া/লেখা যায় না।
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
@@ -15,7 +15,16 @@ service cloud.firestore {
     }
 
     function activeUser() {
-      return signedIn() && profile().status == 'active';
+      return signedIn()
+        && profile().status == 'active'
+        && (
+          profile().role == 'super_admin'
+          || (
+            profile().role == 'subscriber'
+            && profile().get('expires_at', null) is timestamp
+            && profile().get('expires_at', null) > request.time
+          )
+        );
     }
 
     function adminUser() {

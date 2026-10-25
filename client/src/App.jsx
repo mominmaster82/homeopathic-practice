@@ -32,24 +32,42 @@ function LoadingScreen() {
 
 // সুরক্ষিত রুট — লগইন নেই → /login; প্রোফাইল নেই/স্থগিত → অ্যাক্সেস বার্তা
 function ProtectedRoute({ children }) {
-  const { user, profile, profileError, isAuthenticated, isActive, loading, logout } = useAuth();
+  const {
+    user,
+    profile,
+    profileError,
+    isAuthenticated,
+    isActive,
+    isExpired,
+    expiresAt,
+    loading,
+    logout,
+  } = useAuth();
 
   if (loading) return <LoadingScreen />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   if (!isActive) {
     const suspended = profile?.status === 'suspended';
+    const expired = !suspended && isExpired;
+    const expiryLabel = expiresAt ? ` ${expiresAt.toLocaleDateString('en-GB')}` : '';
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="card p-8 max-w-md w-full text-center space-y-3">
-          <div className="text-4xl">{suspended ? '⏸' : '🔒'}</div>
+          <div className="text-4xl">{suspended ? '⏸' : expired ? '⏳' : '🔒'}</div>
           <h1 className="text-xl font-bold text-slate-800">
-            {suspended ? 'অ্যাকাউন্ট স্থগিত' : 'অ্যাক্সেস এখনো চালু হয়নি'}
+            {suspended
+              ? 'অ্যাকাউন্ট স্থগিত'
+              : expired
+                ? 'সাবস্ক্রিপশনের মেয়াদ শেষ'
+                : 'অ্যাক্সেস এখনো চালু হয়নি'}
           </h1>
           <p className="text-sm text-slate-500">
             {suspended
               ? 'আপনার অ্যাকাউন্টটি সাময়িকভাবে বন্ধ আছে। অ্যাডমিনের সাথে যোগাযোগ করুন।'
-              : 'আপনার অ্যাকাউন্ট তৈরি হয়েছে, তবে রোল বা সাবস্ক্রিপশন এখনো সেট করা হয়নি। অ্যাডমিনের সাথে যোগাযোগ করুন।'}
+              : expired
+                ? `আপনার অ্যাক্সেসের মেয়াদ${expiryLabel ? `${expiryLabel} তারিখে` : ''} শেষ হয়েছে। সুপার অ্যাডমিন রিনিউ করলে আবার চালু হবে।`
+                : 'আপনার অ্যাকাউন্ট তৈরি হয়েছে, তবে রোল বা সাবস্ক্রিপশন এখনো সেট করা হয়নি। অ্যাডমিনের সাথে যোগাযোগ করুন।'}
           </p>
           {!profile && (
             <p className="text-xs text-slate-400">

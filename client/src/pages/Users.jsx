@@ -6,6 +6,34 @@ const EMPTY_FORM = { name: '', email: '', password: '', role: 'subscriber', stat
 
 const roleLabel = (role) => (role === 'super_admin' ? 'সুপার অ্যাডমিন' : 'সাবস্ক্রাইবার');
 
+function expiryDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === 'function') return value.toDate();
+  if (value instanceof Date) return value;
+  if (typeof value === 'number') return new Date(value);
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function dateOnly(d) {
+  if (!d) return '';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${day}/${month}/${d.getFullYear()}`;
+}
+
+function isExpiredUser(u) {
+  if (u.role !== 'subscriber') return false;
+  const d = expiryDate(u.expires_at);
+  return !d || d.getTime() <= Date.now();
+}
+
+function inOneYear() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + 1);
+  return dateOnly(d);
+}
+
 export default function Users() {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
@@ -34,7 +62,8 @@ export default function Users() {
   const counts = useMemo(
     () => ({
       total: users.length,
-      active: users.filter((u) => u.status === 'active').length,
+      active: users.filter((u) => u.status === 'active' && !isExpiredUser(u)).length,
+      expired: users.filter((u) => isExpiredUser(u)).length,
       admins: users.filter((u) => u.role === 'super_admin').length,
     }),
     [users]
@@ -49,7 +78,9 @@ export default function Users() {
     try {
       const created = await api.createUserAccount(form);
       setNotice({
-        text: `${created.email} — ইউজার তৈরি হয়েছে। ইমেইল ও পাসওয়ার্ডটি ইউজারকে জানিয়ে দিন।`,
+        text: `${created.email} — ইউজার তৈরি হয়েছে।${
+          created.expires_at ? ` মেয়াদ ${dateOnly(new Date(created.expires_at))} পর্যন্ত।` : ''
+        } ইমেইল ও পাসওয়ার্ডটি ইউজারকে জানিয়ে দিন।`,
         ok: true,
       });
       setForm(EMPTY_FORM);
@@ -85,6 +116,32 @@ export default function Users() {
       await api.updateUserAccess(u.id, { status });
       setNotice({
         text: `${u.email || u.name} — ${status === 'active' ? 'সক্রিয়' : 'স্থগিত'} করা হয়েছে`,
+        ok: true,
+      });
+      await loadUsers();
+    } catch (err) {
+      setNotice({ text: err.message, ok: false });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const renewAccess = async (u) => {
+    const label = u.email || u.name || 'এই ইউজার';
+    const current = expiryDate(u.expires_at);
+    const base = current && current.getTime() > Date.now() ? current : new Date();
+    const next = new Date(base);
+    next.setFullYear(next.getFullYear() + 1);
+    const sure = confirm(
+      `${label} এর সাবস্ক্রিপশন এক বছর বাড়াবেন?\n\nনতুন মেয়াদ: ${dateOnly(next)} পর্যন্ত`
+    );
+    if (!sure) return;
+    setBusyId(u.id);
+    setNotice(null);
+    try {
+      const result = await api.renewUserAccess(u.id);
+      setNotice({
+        text: `${label} — মেয়াদ ${dateOnly(new Date(result.expires_at))} পর্যন্ত বাড়ানো হয়েছে। চলমান সেশনে আপডেট দেখতে ইউজারকে পেজ রিলোড করতে বলুন।`,
         ok: true,
       });
       await loadUsers();
@@ -134,7 +191,7 @@ export default function Users() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="card p-3 text-center">
           <div className="text-2xl font-bold text-slate-800">{counts.total}</div>
           <div className="text-xs text-slate-500">মোট ইউজার</div>
@@ -142,6 +199,10 @@ export default function Users() {
         <div className="card p-3 text-center">
           <div className="text-2xl font-bold text-teal-700">{counts.active}</div>
           <div className="text-xs text-slate-500">সক্রিয়</div>
+        </div>
+        <div className="card p-3 text-center">
+          <div className="text-2xl font-bold text-red-600">{counts.expired}</div>
+          <div className="text-xs text-slate-500">মেয়াদোত্তীর্ণ</div>
         </div>
         <div className="card p-3 text-center">
           <div className="text-2xl font-bold text-slate-800">{counts.admins}</div>
@@ -223,8 +284,8 @@ export default function Users() {
 
           <p className="text-xs text-slate-500">
             {form.role === 'super_admin'
-              ? 'সুপার অ্যাডমিন সব ফিচার এবং এই ইউজার ম্যানেজমেন্ট ব্যবহার করতে পারবে।'
-              : 'সাবস্ক্রাইবার রেপার্টরি, ম্যাটেরিয়া মেডিকা ও বিশ্লেষণ ব্যবহার করতে পারবে — সেভ/এডিট/ডিলিট বা রোগীর তথ্য নয়।'}
+              ? 'সুপার অ্যাডমিনের মেয়াদসীমা নেই এবং সব ফিচার ও এই ইউজার ম্যানেজমেন্ট ব্যবহার করতে পারবে।'
+              : `সাবস্ক্রাইবার আজ থেকে এক বছর সক্রিয় থাকবে — ${inOneYear()} পর্যন্ত। এরপর অ্যাক্সেস স্বয়ংক্রিয়ভাবে বন্ধ হবে; পরে রিনিউ করা যাবে।`}
           </p>
 
           <div className="flex gap-2">
@@ -247,6 +308,8 @@ export default function Users() {
       )}
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-500 leading-relaxed">
+        সাবস্ক্রাইবারের অ্যাক্সেস তৈরি বা রিনিউ করার দিন থেকে এক বছর চলে। মেয়াদ শেষ হলে
+        অ্যাক্সেস স্বয়ংক্রিয়ভাবে বন্ধ হয়ে যায় এবং ‘রিনিউ (১ বছর)’ দিয়ে আবার চালু করা যায়।
         সাবস্ক্রাইবার রেপার্টরি, ম্যাটেরিয়া মেডিকা ও বিশ্লেষণ ব্যবহার করতে পারে — কিন্তু কোনো তথ্য
         সেভ, এডিট বা ডিলিট করতে পারে না এবং রোগী/কেস দেখতে পায় না। রোল বা স্ট্যাটাস বদলালে
         ইউজারকে পেজ রিলোড বা আবার লগইন করতে হবে। নিজের অ্যাকাউন্টের রোল/স্ট্যাটাস বদলানো বা
@@ -269,7 +332,10 @@ export default function Users() {
           <div className="space-y-2">
             {users.map((u) => {
               const isMe = u.id === user?.uid;
-              const isActive = u.status === 'active';
+              const isSubscriber = u.role === 'subscriber';
+              const expired = isExpiredUser(u);
+              const isActive = u.status === 'active' && !expired;
+              const expiry = isSubscriber ? expiryDate(u.expires_at) : null;
               const busy = busyId === u.id;
               return (
                 <div
@@ -286,20 +352,28 @@ export default function Users() {
                       )}
                       <span
                         className={`badge ${
-                          isActive
-                            ? 'border-teal-200 bg-teal-50 text-teal-700'
-                            : 'border-amber-200 bg-amber-50 text-amber-700'
+                          expired
+                            ? 'border-red-200 bg-red-50 text-red-700'
+                            : isActive
+                              ? 'border-teal-200 bg-teal-50 text-teal-700'
+                              : 'border-amber-200 bg-amber-50 text-amber-700'
                         }`}
                       >
-                        {isActive ? 'সক্রিয়' : 'স্থগিত'}
+                        {expired ? 'মেয়াদোত্তীর্ণ' : isActive ? 'সক্রিয়' : 'স্থগিত'}
                       </span>
                     </div>
                     <div className="text-sm text-slate-500">{u.email || 'ইমেইল নেই'}</div>
-                    {u.created_at && (
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        তৈরি: {formatDateBD(u.created_at)}
-                      </div>
-                    )}
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      {u.created_at && <>তৈরি: {formatDateBD(u.created_at)} · </>}
+                      {isSubscriber ? (
+                        <span className={expired ? 'text-red-600 font-medium' : undefined}>
+                          মেয়াদ: {expiry ? `${dateOnly(expiry)} পর্যন্ত` : 'সেট করা নেই'}
+                          {expired ? ' — শেষ হয়েছে' : ''}
+                        </span>
+                      ) : (
+                        'মেয়াদসীমা নেই'
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -315,17 +389,29 @@ export default function Users() {
                         <option value="super_admin">সুপার অ্যাডমিন</option>
                       </select>
                     </div>
-                    <button
-                      onClick={() => toggleStatus(u)}
-                      disabled={isMe || busy}
-                      className={`btn btn-sm ${
-                        isActive
-                          ? 'border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
-                          : 'btn-primary'
-                      }`}
-                    >
-                      {isActive ? 'স্থগিত করুন' : 'সক্রিয় করুন'}
-                    </button>
+                    {!expired && (
+                      <button
+                        onClick={() => toggleStatus(u)}
+                        disabled={isMe || busy}
+                        className={`btn btn-sm ${
+                          isActive
+                            ? 'border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                            : 'btn-primary'
+                        }`}
+                      >
+                        {isActive ? 'স্থগিত করুন' : 'সক্রিয় করুন'}
+                      </button>
+                    )}
+                    {isSubscriber && (
+                      <button
+                        onClick={() => renewAccess(u)}
+                        disabled={busy}
+                        className="btn btn-sm border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100"
+                        title="মেয়াদ এক বছর বাড়ান"
+                      >
+                        ↻ রিনিউ (১ বছর)
+                      </button>
+                    )}
                     <button
                       onClick={() => removeAccess(u)}
                       disabled={isMe || busy}

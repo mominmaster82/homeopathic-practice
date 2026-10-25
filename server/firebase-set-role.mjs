@@ -5,16 +5,18 @@
 //   node firebase-set-role.mjs --email user@example.com --role subscriber --status active --apply
 //   node firebase-set-role.mjs --email user@example.com --role subscriber --status active \
 //     --create --password 'Secret123' --name 'Dr. Karim' --apply
+//   node firebase-set-role.mjs --email user@example.com --renew --apply
 //   node firebase-set-role.mjs --email user@example.com --delete --apply
 import { readFileSync, existsSync } from 'node:fs';
 import { initializeApp, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 
 const APPLY = process.argv.includes('--apply');
 const LIST = process.argv.includes('--list');
 const CREATE = process.argv.includes('--create');
 const DELETE = process.argv.includes('--delete');
+const RENEW = process.argv.includes('--renew');
 const ROLES = ['super_admin', 'subscriber'];
 const STATUSES = ['active', 'suspended'];
 
@@ -38,6 +40,30 @@ const flag = (name) => {
   return value && !value.startsWith('--') ? value : '';
 };
 
+const oneYearFrom = (base = new Date()) => {
+  const d = new Date(base);
+  d.setFullYear(d.getFullYear() + 1);
+  return d;
+};
+
+const asDate = (value) => {
+  if (!value) return null;
+  if (typeof value.toDate === 'function') return value.toDate();
+  if (value instanceof Date) return value;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const dateOnly = (d) =>
+  d ? new Date(d.getTime() + BD_OFFSET_MS).toISOString().slice(0, 10) : '';
+
+function expiryLabel(p) {
+  if (!p || p.role === 'super_admin') return 'মেয়াদসীমা নেই';
+  const d = asDate(p.expires_at);
+  if (!d) return 'মেয়াদ নেই';
+  return `${dateOnly(d)}${d.getTime() <= Date.now() ? ' (শেষ)' : ''}`;
+}
+
 async function listUsers() {
   const authUsers = [];
   let pageToken;
@@ -56,13 +82,17 @@ async function listUsers() {
     const p = profiles.get(u.uid);
     const role = p?.role || '—';
     const status = p?.status || '—';
-    console.log(`${u.email || '(ইমেইল নেই)'}  uid=${u.uid}  role=${role}  status=${status}`);
+    console.log(
+      `${u.email || '(ইমেইল নেই)'}  uid=${u.uid}  role=${role}  status=${status}  মেয়াদ=${expiryLabel(p)}`
+    );
     if (p) profiles.delete(u.uid);
   }
   if (profiles.size > 0) {
     console.log('\nAuth-এ নেই এমন users ডকুমেন্ট (পরিষ্কার করা দরকার):');
     for (const [uid, p] of profiles) {
-      console.log(`  ${uid}  ${p.email || ''}  role=${p.role || '—'}  status=${p.status || '—'}`);
+      console.log(
+        `  ${uid}  ${p.email || ''}  role=${p.role || '—'}  status=${p.status || '—'}  মেয়াদ=${expiryLabel(p)}`
+      );
     }
   }
 }
@@ -127,15 +157,26 @@ async function setRole() {
     throw new Error('এই ইউজারের কোনো রোল নেই — --role super_admin|subscriber দিন।');
   }
 
+  // সাবস্ক্রাইবারের মেয়াদ না থাকলে বা শেষ হয়ে থাকলে নতুন এক বছর চালু হয়
+  const currentExpiry = asDate(existing?.expires_at);
+  const nextExpiry =
+    finalRole === 'subscriber' && (!currentExpiry || currentExpiry.getTime() <= Date.now())
+      ? oneYearFrom()
+      : null;
+
   const planned = {
     email,
     name: name || existing?.name || authUser?.displayName || '',
     role: finalRole,
     status: finalStatus,
+    ...(nextExpiry ? { expires_at: Timestamp.fromDate(nextExpiry) } : {}),
   };
 
   console.log(authUser ? 'বিদ্যমান Auth ইউজার পাওয়া গেছে।' : 'নতুন Auth ইউজার তৈরি হবে।');
-  console.log('পরিকল্পিত users ডকুমেন্ট:', planned);
+  console.log(
+    'পরিকল্পিত users ডকুমেন্ট:',
+    nextExpiry ? { ...planned, expires_at: dateOnly(nextExpiry) } : planned
+  );
   console.log(`অবস্থা: ${APPLY ? 'আসলে লিখবে (--apply)' : 'শুধু dry-run'}`);
 
   if (!APPLY) {
@@ -158,12 +199,58 @@ async function setRole() {
     { ...planned, created_at: createdAt, updated_at: nowBD() },
     { merge: true }
   );
-  console.log(`users/${authUser.uid} সংরক্ষণ হয়েছে — role=${finalRole}, status=${finalStatus}`);
+  const savedExpiry = expiryLabel({
+    role: finalRole,
+    expires_at: nextExpiry || existing?.expires_at,
+  });
+  console.log(
+    `users/${authUser.uid} সংরক্ষণ হয়েছে — role=${finalRole}, status=${finalStatus}, মেয়াদ=${savedExpiry}`
+  );
+}
+
+async function renewAccess() {
+  const email = flag('email').trim().toLowerCase();
+  if (!email) throw new Error('--email দিন');
+
+  let authUser;
+  try {
+    authUser = await adminAuth.getUserByEmail(email);
+  } catch (err) {
+    if (err?.code === 'auth/user-not-found') throw new Error('এই ইমেইলে কোনো Auth ইউজার নেই');
+    throw err;
+  }
+
+  const ref = db.doc(`users/${authUser.uid}`);
+  const profile = (await ref.get()).data();
+  if (!profile) throw new Error('এই ইউজারের কোনো users প্রোফাইল নেই');
+  if (profile.role !== 'subscriber') {
+    throw new Error('শুধু সাবস্ক্রাইবারের মেয়াদ রিনিউ করা যায়');
+  }
+
+  const current = asDate(profile.expires_at);
+  const base = current && current.getTime() > Date.now() ? current : new Date();
+  const next = oneYearFrom(base);
+
+  console.log(
+    `${email} — বর্তমান মেয়াদ: ${expiryLabel(profile)} → নতুন মেয়াদ: ${dateOnly(next)} (status=active)`
+  );
+  console.log(`অবস্থা: ${APPLY ? 'আসলে লিখবে (--apply)' : 'শুধু dry-run'}`);
+  if (!APPLY) {
+    console.log('\nরিনিউ করতে আবার --apply দিয়ে চালান।');
+    return;
+  }
+
+  await ref.set(
+    { status: 'active', expires_at: Timestamp.fromDate(next), updated_at: nowBD() },
+    { merge: true }
+  );
+  console.log(`users/${authUser.uid} — মেয়াদ ${dateOnly(next)} পর্যন্ত রিনিউ হয়েছে।`);
 }
 
 try {
   if (LIST) await listUsers();
   else if (DELETE) await deleteUser();
+  else if (RENEW) await renewAccess();
   else await setRole();
 } catch (err) {
   console.error('ত্রুটি:', err.message || err);

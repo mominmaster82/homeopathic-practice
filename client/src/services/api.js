@@ -14,6 +14,8 @@ import {
   runTransaction,
   writeBatch,
   getCountFromServer,
+  Timestamp,
+  documentId,
 } from 'firebase/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import {
@@ -964,6 +966,33 @@ const authApi = {
 const USER_ROLES = ['super_admin', 'subscriber'];
 const USER_STATUSES = ['active', 'suspended'];
 
+// সাবস্ক্রিপশনের মেয়াদ এক বছর — বর্তমান সময় বা চলমান মেয়াদের শেষ থেকে
+function oneYearFrom(base = new Date()) {
+  const d = new Date(base);
+  d.setFullYear(d.getFullYear() + 1);
+  return d;
+}
+
+function asDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === 'function') return value.toDate();
+  if (value instanceof Date) return value;
+  if (typeof value === 'number') return new Date(value);
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// অ্যাডমিন অন্য ইউজারের ডকুমেন্ট পড়ে ফিল্টার করা list কুয়েরি দিয়ে
+// (rules-এ admin-এর জন্য সরাসরি get অনুমোদিত নয়, list অনুমোদিত)
+async function getUserRow(id) {
+  const snap = await getDocs(
+    query(collection(db, 'users'), where(documentId(), '==', id))
+  );
+  if (snap.empty) return null;
+  const d = snap.docs[0];
+  return { id: d.id, ...d.data() };
+}
+
 function userError(err) {
   const code = err?.code || '';
   if (code === 'auth/email-already-in-use') {
@@ -1012,6 +1041,7 @@ const usersApi = {
     if (!USER_ROLES.includes(role)) throw new Error('রোল সঠিক নয়');
     if (!USER_STATUSES.includes(status)) throw new Error('স্ট্যাটাস সঠিক নয়');
 
+    const expiresAt = role === 'subscriber' ? oneYearFrom() : null;
     const secondaryApp = initializeApp(firebaseConfig, `user-create-${Date.now()}`);
     const secondaryAuth = getAuth(secondaryApp);
     let created = null;
@@ -1023,10 +1053,15 @@ const usersApi = {
         email: cleanEmail,
         role,
         status,
+        ...(expiresAt ? { expires_at: Timestamp.fromDate(expiresAt) } : {}),
         created_at: now(),
         created_by: auth.currentUser?.uid || null,
       });
-      return { id: created.uid, email: cleanEmail };
+      return {
+        id: created.uid,
+        email: cleanEmail,
+        expires_at: expiresAt ? expiresAt.toISOString() : null,
+      };
     } catch (err) {
       // প্রোফাইল লেখা ব্যর্থ হলে Auth ইউজারটি এতিম থাকে যেন না
       if (created) {
@@ -1067,10 +1102,45 @@ const usersApi = {
       patch.status = status;
     }
     if (!Object.keys(patch).length) throw new Error('কোনো পরিবর্তন নেই');
-    patch.updated_at = now();
     try {
-      await updateDoc(doc(db, 'users', id), patch);
+      // সাবস্ক্রাইবার বানালে মেয়াদ না থাকলে/শেষ হয়ে থাকলে নতুন এক বছর চালু হয়
+      if (role === 'subscriber') {
+        const row = await getUserRow(id);
+        if (!row) throw new Error('ইউজার পাওয়া যায়নি');
+        const current = asDate(row.expires_at);
+        if (!current || current.getTime() <= Date.now()) {
+          patch.expires_at = Timestamp.fromDate(oneYearFrom());
+        }
+      }
+      patch.updated_at = now();
+      const ref = doc(db, 'users', id);
+      await updateDoc(ref, patch);
       return { ok: true };
+    } catch (err) {
+      throw userError(err);
+    }
+  },
+
+  // মেয়াদ বাড়ানো — চলমান মেয়াদ থাকলে তার শেষ থেকে, নাহলে আজ থেকে এক বছর
+  renewUserAccess: async (uid) => {
+    const id = String(uid || '').trim();
+    if (!id) throw new Error('ইউজার আইডি নেই');
+    if (auth.currentUser?.uid === id) throw new Error('নিজের অ্যাক্সেস রিনিউ করার দরকার নেই');
+    try {
+      const existing = await getUserRow(id);
+      if (!existing) throw new Error('ইউজার পাওয়া যায়নি');
+      if (existing.role !== 'subscriber') {
+        throw new Error('শুধু সাবস্ক্রাইবারের মেয়াদ রিনিউ করা যায়');
+      }
+      const current = asDate(existing.expires_at);
+      const base = current && current.getTime() > Date.now() ? current : new Date();
+      const next = oneYearFrom(base);
+      await updateDoc(doc(db, 'users', id), {
+        status: 'active',
+        expires_at: Timestamp.fromDate(next),
+        updated_at: now(),
+      });
+      return { ok: true, expires_at: next.toISOString() };
     } catch (err) {
       throw userError(err);
     }
