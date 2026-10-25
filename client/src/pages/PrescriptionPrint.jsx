@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, formatDateBD } from '../services/api.js';
 import { extraCaseFields } from './caseFields.js';
+import { buildPrescriptionMessage, buildWhatsAppUrl } from '../utils/whatsapp.js';
 
 export default function PrescriptionPrint() {
   const { caseId } = useParams();
@@ -39,6 +40,13 @@ export default function PrescriptionPrint() {
     return <div className="py-8 text-center text-sm text-slate-400">লোড হচ্ছে…</div>;
   }
 
+  const whatsappUrl = buildWhatsAppUrl(patient.phone, buildPrescriptionMessage({
+    patient,
+    caseData,
+    settings,
+    dateText: formatDateBD(caseData.date),
+  }));
+
   return (
     <div className="space-y-4">
       {/* এই বাটনগুলো প্রিন্টে দেখাবে না */}
@@ -48,6 +56,14 @@ export default function PrescriptionPrint() {
           className="btn btn-primary"
         >
           🖨 প্রিন্ট / PDF সেভ
+        </button>
+        <button
+          onClick={() => window.open(whatsappUrl, '_blank', 'noopener,noreferrer')}
+          disabled={!whatsappUrl}
+          title={whatsappUrl ? 'WhatsApp-এ প্রেসক্রিপশন পাঠান' : 'রোগীর ফোন নম্বর নেই'}
+          className="btn btn-ghost disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          WhatsApp-এ পাঠান
         </button>
         <button
           onClick={() => navigate('/case')}

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api, formatDateBD } from '../services/api.js';
 import { extraCaseFields } from './caseFields.js';
+import { buildPrescriptionMessage, buildWhatsAppUrl, normalizeWhatsAppPhone } from '../utils/whatsapp.js';
 
 const potencies = ['6C', '30C', '200C', '1M', '0/1 (LM)', 'Q (মাতৃটিংচার)'];
 const input = 'input';
@@ -18,6 +19,7 @@ export default function PatientProfile() {
   const [msg, setMsg] = useState('');        // ফ্যাটাল লোড-এরর (এরর স্ক্রিন দেখায়)
   const [notice, setNotice] = useState('');   // নন-ফ্যাটাল সফলতা/এরর বার্তা
   const [remedies, setRemedies] = useState([]);
+  const [settings, setSettings] = useState({});
 
   const [showCaseForm, setShowCaseForm] = useState(false);
   const [caseForm, setCaseForm] = useState(emptyCase);
@@ -37,6 +39,7 @@ export default function PatientProfile() {
   );
   useEffect(() => { load(); }, [load]);
   useEffect(() => { api.getRemedies().then(setRemedies).catch(() => {}); }, []);
+  useEffect(() => { api.getSettings().then(setSettings).catch(() => {}); }, []);
 
   if (msg) {
     return (
@@ -48,6 +51,21 @@ export default function PatientProfile() {
   }
 
   if (!p) return <div className="py-8 text-center text-sm text-slate-400">লোড হচ্ছে…</div>;
+
+  const whatsappPhone = normalizeWhatsAppPhone(p.phone);
+  const sendWhatsApp = (c) => {
+    const url = buildWhatsAppUrl(p.phone, buildPrescriptionMessage({
+      patient: p,
+      caseData: c,
+      settings,
+      dateText: formatDateBD(c.date),
+    }));
+    if (!url) {
+      setNotice('রোগীর ফোন নম্বর নেই বা সঠিক নয়');
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   const caseCount = p.cases.length;
   const rxCount = p.cases.reduce((n, c) => n + c.prescriptions.length, 0);
@@ -368,6 +386,14 @@ export default function PatientProfile() {
                       <Link to={`/print/${c.id}`} className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline">
                         🖨 প্রিন্ট / PDF
                       </Link>
+                      <button
+                        onClick={() => sendWhatsApp(c)}
+                        disabled={!whatsappPhone}
+                        title={whatsappPhone ? 'WhatsApp-এ প্রেসক্রিপশন পাঠান' : 'রোগীর ফোন নম্বর নেই'}
+                        className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline"
+                      >
+                        WhatsApp
+                      </button>
                       <button
                         onClick={() => (editCaseId === c.id ? cancelEditCase() : startEditCase(c))}
                         className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
