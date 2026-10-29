@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useDeferredValue } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { suggestRemediesForRubric } from '../utils/linkSuggest.js';
-import { searchRubrics, searchRemedies, highlightSegments } from '../utils/search.js';
+import { searchRubrics, searchRemedies, searchRemediesProse, highlightSegments, warmSearchIndexes } from '../utils/search.js';
 
 const input = 'input';
 const label = 'label';
@@ -115,6 +115,17 @@ export default function Repertory() {
     loadSections();
     api.getRemedies().then(setAllRemedies).catch(() => {});
   }, []);
+
+  // প্রথম কিস্ট্রোকের আগেই সার্চ-ইনডেক্স তৈরি রাখি (অলস সময়ে)
+  useEffect(() => {
+    const run = () => warmSearchIndexes(rubrics, allRemedies);
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(run, { timeout: 2500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = setTimeout(run, 300);
+    return () => clearTimeout(id);
+  }, [rubrics, allRemedies]);
   useEffect(() => {
     let active = true;
     api.getRubrics(section)
@@ -153,11 +164,30 @@ export default function Repertory() {
     () => (customOnly ? rubrics.filter((r) => !!r.is_custom) : rubrics),
     [rubrics, customOnly]
   );
-  const search = useMemo(() => searchRubrics(rubricPool, query), [rubricPool, query]);
+  // লেখার সময় ইনপুট আটকে না যায় — ফলাফল একটু পরে গণনা হয়
+  const deferredQuery = useDeferredValue(query);
+
+  const search = useMemo(() => searchRubrics(rubricPool, deferredQuery), [rubricPool, deferredQuery]);
   const filtered = search.items;
   const topSuggestions = useMemo(
-    () => (query.trim() ? filtered.slice(0, 8) : []),
-    [filtered, query]
+    () => (deferredQuery.trim() ? filtered.slice(0, 8) : []),
+    [filtered, deferredQuery]
+  );
+
+  // কী-নোট/ক্লিনিক্যাল ব্যবহারের টেক্সট থেকেও ওষুধ খুঁজি — গদ্য লেখা হলেও
+  const remedyHits = useMemo(() => {
+    if (!deferredQuery.trim()) return [];
+    return searchRemediesProse(allRemedies, deferredQuery, { limit: 8 });
+  }, [allRemedies, deferredQuery]);
+  const comboRemedies = useMemo(() => remedyHits.slice(0, 4), [remedyHits]);
+
+  // ↑↓/Enter একই তালিকায় ওষুধ ও রুব্রিক — দুটোই বেছে নেওয়া যায়
+  const comboItems = useMemo(
+    () => [
+      ...comboRemedies.map((hit) => ({ type: 'remedy', hit })),
+      ...topSuggestions.map((item) => ({ type: 'rubric', item })),
+    ],
+    [comboRemedies, topSuggestions]
   );
 
   // শাখা অনুযায়ী গ্রুপ
@@ -210,20 +240,32 @@ export default function Repertory() {
     revealRubric(item.rubric.id);
   };
 
+  const openRemedy = (remedy) => {
+    if (!remedy) return;
+    setSuggestOpen(false);
+    navigate('/materia', { state: { focusRemedyId: remedy.id } });
+  };
+
+  const pickCombo = (entry) => {
+    if (!entry) return;
+    if (entry.type === 'remedy') openRemedy(entry.hit.remedy);
+    else pickSuggestion(entry.item);
+  };
+
   const onSearchKeyDown = (e) => {
     if (e.key === 'Escape') { setSuggestOpen(false); return; }
-    if (!topSuggestions.length) return;
+    if (!comboItems.length) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (!suggestOpen) { setSuggestOpen(true); setSuggestIndex(0); }
-      else setSuggestIndex((i) => (i + 1) % topSuggestions.length);
+      else setSuggestIndex((i) => (i + 1) % comboItems.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      if (!suggestOpen) { setSuggestOpen(true); setSuggestIndex(topSuggestions.length - 1); }
-      else setSuggestIndex((i) => (i - 1 + topSuggestions.length) % topSuggestions.length);
+      if (!suggestOpen) { setSuggestOpen(true); setSuggestIndex(comboItems.length - 1); }
+      else setSuggestIndex((i) => (i - 1 + comboItems.length) % comboItems.length);
     } else if (e.key === 'Enter' && suggestOpen) {
       e.preventDefault();
-      pickSuggestion(topSuggestions[Math.min(suggestIndex, topSuggestions.length - 1)]);
+      pickCombo(comboItems[Math.min(suggestIndex, comboItems.length - 1)]);
     }
   };
 
@@ -453,7 +495,7 @@ export default function Repertory() {
         >
           <input
             className="input"
-            placeholder="🔍 রুব্রিক খুঁজুন..."
+            placeholder="🔍 রুব্রিক, লক্ষণ বা গদ্য লিখুন..."
             value={query}
             onChange={(e) => {
               const value = e.target.value;
@@ -475,34 +517,75 @@ export default function Repertory() {
               id="rubric-search-suggestions"
               className="absolute z-20 mt-1 w-full max-h-80 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"
             >
-              {topSuggestions.length === 0 ? (
-                <div className="px-3 py-3 text-sm text-slate-400">কোনো রুব্রিক মেলেনি — বানান বদলে দেখুন।</div>
+              {comboItems.length === 0 ? (
+                <div className="px-3 py-3 text-sm text-slate-400">
+                  কোনো রুব্রিক বা ওষুধ মেলেনি — বানান বদলে বা কম শব্দ লিখে দেখুন।
+                </div>
               ) : (
                 <>
-                  <div className="sticky top-0 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-400 border-b border-slate-100">
-                    {search.partial ? 'কাছাকাছি রুব্রিক' : 'মিলে যাওয়া রুব্রিক'} · ↑↓ বেছে নিন, Enter খুলুন
+                  <div className="sticky top-0 z-10 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-400 border-b border-slate-100">
+                    {search.partial ? 'কাছাকাছি মিল' : 'মিলে যাওয়া'} · ↑↓ বেছে নিন, Enter খুলুন
                   </div>
-                  <ul>
-                    {topSuggestions.map((item, i) => (
-                      <li key={item.rubric.id}>
-                        <button
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onMouseEnter={() => setSuggestIndex(i)}
-                          onClick={() => pickSuggestion(item)}
-                          className={`w-full px-3 py-2 text-left ${i === suggestIndex ? 'bg-teal-50' : 'hover:bg-slate-50'}`}
-                        >
-                          <span className="block text-sm text-slate-700">
-                            <HighlightedText text={item.rubric.rubric_text} words={item.matchedWords} />
-                          </span>
-                          <span className="block text-[11px] text-slate-400">
-                            {item.rubric.section}
-                            {item.rubric.is_custom ? ' · নিজের যোগ করা' : ''}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  {comboRemedies.length > 0 && (
+                    <>
+                      <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-teal-700">
+                        💊 কী-নোট / ক্লিনিক্যাল ব্যবহারে মিলে যাওয়া ওষুধ
+                      </div>
+                      <ul>
+                        {comboRemedies.map((hit, i) => (
+                          <li key={`remedy-${hit.remedy.id}`}>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onMouseEnter={() => setSuggestIndex(i)}
+                              onClick={() => openRemedy(hit.remedy)}
+                              title="ম্যাটেরিয়া মেডিকায় এই ওষুধ দেখুন"
+                              className={`w-full px-3 py-2 text-left ${i === suggestIndex ? 'bg-teal-50' : 'hover:bg-slate-50'}`}
+                            >
+                              <span className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-sm font-medium text-slate-700">{hit.remedy.name}</span>
+                                <span className="badge border-teal-200 bg-teal-50 text-teal-700">{hit.fieldLabel}</span>
+                              </span>
+                              <span className="mt-0.5 block text-[11px] leading-snug text-slate-500">
+                                <HighlightedText text={hit.snippet} words={hit.matchedWords} />
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  {topSuggestions.length > 0 && (
+                    <>
+                      <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-slate-500">
+                        📚 মিলে যাওয়া রুব্রিক
+                      </div>
+                      <ul>
+                        {topSuggestions.map((item, i) => {
+                          const index = comboRemedies.length + i;
+                          return (
+                            <li key={item.rubric.id}>
+                              <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onMouseEnter={() => setSuggestIndex(index)}
+                                onClick={() => pickSuggestion(item)}
+                                className={`w-full px-3 py-2 text-left ${index === suggestIndex ? 'bg-teal-50' : 'hover:bg-slate-50'}`}
+                              >
+                                <span className="block text-sm text-slate-700">
+                                  <HighlightedText text={item.rubric.rubric_text} words={item.matchedWords} />
+                                </span>
+                                <span className="block text-[11px] text-slate-400">
+                                  {item.rubric.section}
+                                  {item.rubric.is_custom ? ' · নিজের যোগ করা' : ''}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -549,7 +632,43 @@ export default function Repertory() {
 
       {search.partial && (
         <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          সব শব্দ মেলেনি — কাছাকাছি রুব্রিক দেখানো হচ্ছে। কম শব্দ লিখে বা বানান বদলে আবার চেষ্টা করুন।
+          সব শব্দ মেলেনি — কাছাকাছি রুব্রিক ও ওষুধ দেখানো হচ্ছে। কম শব্দ লিখে বা বানান বদলে আবার চেষ্টা করুন।
+        </div>
+      )}
+
+      {query.trim() && remedyHits.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-1 px-4 py-2.5 bg-teal-50 border-b border-teal-100">
+            <div className="text-sm font-semibold text-teal-800">
+              💊 সম্পর্কিত ওষুধ — কী-নোট ও ক্লিনিক্যাল ব্যবহার থেকে
+            </div>
+            <div className="text-[11px] text-teal-700/70">নামে ক্লিক করে ম্যাটেরিয়া মেডিকায় দেখুন</div>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {remedyHits.map((hit) => (
+              <li key={hit.remedy.id} className="px-4 py-2.5 hover:bg-slate-50/60 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => openRemedy(hit.remedy)}
+                  className="w-full text-left"
+                  title="ম্যাটেরিয়া মেডিকায় এই ওষুধ দেখুন"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-slate-700 hover:text-teal-700">{hit.remedy.name} ↗</span>
+                    <span className="badge border-teal-200 bg-teal-50 text-teal-700">{hit.fieldLabel}</span>
+                    {hit.totalTokens > 2 && (
+                      <span className="text-[11px] text-slate-400">
+                        {hit.matchedTokens}/{hit.totalTokens} শব্দ মিলেছে
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+                    <HighlightedText text={hit.snippet} words={hit.matchedWords} />
+                  </p>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -829,10 +948,10 @@ export default function Repertory() {
         </div>
       ))}
 
-      {filtered.length === 0 && (
+      {filtered.length === 0 && remedyHits.length === 0 && (
         <div className="card py-8 text-center text-sm text-slate-400">
           {query.trim()
-            ? `“${query.trim()}” — কোনো রুব্রিক পাওয়া যায়নি। বানান বদলে বা কম শব্দ লিখে দেখুন।`
+            ? `“${query.trim()}” — কোনো রুব্রিক বা ওষুধ পাওয়া যায়নি। বানান বদলে বা কম শব্দ লিখে দেখুন।`
             : customOnly
               ? 'নিজের যোগ করা কোনো রুব্রিক পাওয়া যায়নি — ফিল্টার বন্ধ করে দেখুন।'
               : 'কোনো রুব্রিক পাওয়া যায়নি।'}
