@@ -2,6 +2,9 @@
 // এটি একটি নমুনা রেপার্টরি; প্রয়োজনে আরও রুব্রিক/ওষুধ যোগ করা যাবে।
 // লিংক-কী ফরম্যাট: "Section > English text" (রুব্রিক টেক্সটের ইংরেজি অংশ, বাংলা বন্ধনী বাদে)।
 
+import { extraRemedies, extraLinks } from './remedies-300.js';
+import { extraRemedies2, extraLinks2 } from './remedies-500.js';
+
 export const remedies = [
   { name: 'Aconite', source: 'Aconitum napellus', keynotes: 'হঠাৎ তীব্র শুরু, জ্বরের আগে কাঁপুনি, শুষ্ক ত্বক, ঠান্ডা শুষ্ক বাতাসে বাড়ে। মন: মৃত্যুভয়, ভিড়ে আতঙ্ক, ভবিষ্যৎ নিয়ে ভয়, কেউ কাছে এলে অস্বস্তি', clinical: 'জ্বর, সর্দি-কাশি, ক্রুপ, ভয়-উদ্বেগ, শ্বাসকষ্ট', better: 'খোলা বাতাস, ঠান্ডা, শান্ত থাকলে', worse: 'শুষ্ক ঠান্ডা বাতাস, রাতে, ভিড়-গরমে' },
   { name: 'Allium cepa', source: 'Allium cepa', keynotes: 'নাক দিয়ে জ্বালাপোড়া পানি, চোখে মিহি পানি, অবিরাম হাঁচি, সন্ধ্যায় বাড়ে। মন: সর্দিতে ক্লান্তি, সহজে বিরক্তি, ঘুমের অভাব', clinical: 'সর্দি, হাঁচি, চোখের প্রদাহ, অ্যালার্জি', better: 'খোলা বাতাস, ঠান্ডা ঘরে', worse: 'গরম ঘরে, সন্ধ্যায়' },
@@ -186,6 +189,8 @@ export const remedies = [
   { name: 'Mercurius corrosivus', source: 'Mercurius corrosivus', keynotes: 'তীব্র আমাশয়, মলত্যাগে জ্বালা ও কোঁথ, মুখে গভীর আলসার, লালা বেশি। মন: অস্থির, খিটখিটে, ভয়', clinical: 'আমাশয়, মুখের আলসার, প্রস্রাবে জ্বালা, চোখের প্রদাহ', better: 'ঠান্ডা পানিতে, বিশ্রামে', worse: 'রাতে, গরমে, মলত্যাগে' },
   { name: 'Syzygium jambolanum', source: 'Syzygium jambolanum', keynotes: 'ঘন ঘন প্রস্রাব, অতিরিক্ত তৃষ্ণা, মুখ শুষ্ক, ক্ষত দেরিতে সারে। মন: ক্লান্তি, উদ্বেগ, বিরক্তি', clinical: 'ডায়াবেটিস, ঘন ঘন প্রস্রাব, ফোড়া, দুর্বলতা', better: 'নিয়মিত খাবারে', worse: 'মিষ্টি খেলে, রাতে' },
   { name: 'Kali arsenicosum', source: 'Kali arsenicosum', keynotes: 'শুষ্ক খসখসে ত্বক, চুলকানি, দুর্বলতা, খাবারে অসহিষ্ণুতা। মন: স্বাস্থ্য নিয়ে উদ্বেগ, ভয়, খিটখিটে', clinical: 'চর্মরোগ, একজিমা, খাদ্য-অসহিষ্ণুতা, দুর্বলতা, উদ্বেগ', better: 'গরমে, খোলা বাতাসে', worse: 'ঠান্ডায়, রাতে, মানসিক চাপে' },
+  ...extraRemedies,
+  ...extraRemedies2,
 ];
 
 // প্রতিটি রুব্রিক: { section, text }
@@ -3423,4 +3428,6 @@ export const links = [
   ['Clinical > Herpes zoster', 'Sulphur', 1],
   ['Clinical > Hair loss', 'Calcarea carb', 1],
   ['Clinical > Vaccine reactions', 'Merc sol', 1],
+  ...extraLinks,
+  ...extraLinks2,
 ];
