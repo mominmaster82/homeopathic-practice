@@ -8,6 +8,8 @@ metadata:
 হোমিওপ্যাথিক সফটওয়্যার প্রজেক্টের আসল লোকেশন:
 `C:\Users\Smart\OneDrive\Documents\Qoder\2026-09-19\2ec566b7`
 
+- **মেমোরি মিরর (২০২৬-১০-৩০):** `.qoder`-এর মেমোরি ফোল্ডার git-এ নেই, তাই মেমোরি আপডেটের পর `docs/memory/`-তে কপি করে অ্যাপ রিপোতে কমিট/পুশ করতে হয় (ব্যবহারকারীর পছন্দ)। কপি করার নিয়ম: `cp "<project-memory-dir>"/*.md docs/memory/` → `git add docs/memory` → commit → push।
+
 - React + Vite + Tailwind (client), Node/Express + SQLite `node:sqlite` (server), Firebase ও আছে (.firebaserc, firebase-upload.mjs)
 - **গুরুত্বপূর্ণ:** ক্লায়েন্ট (client/src/services/api.js) সরাসরি **Firestore** পড়ে/লেখে — Express API ব্যবহার করে না। Express+SQLite মূলত সোর্স/সিড; `server/db/data.js` → seed → SQLite → `firebase-upload.mjs`/`firebase-sync-clinical.mjs` → Firestore।
 - ডেটা মডেল (server/db/data.js → schema.sql): `remedies` (keynotes, clinical, better, worse) + `rubrics` (section, text) + `links` → `rubric_remedies` (rubric, remedy, grade 1-3) — links-ই ম্যাটেরিয়া মেডিকা ও রেপার্টরির সেতু
