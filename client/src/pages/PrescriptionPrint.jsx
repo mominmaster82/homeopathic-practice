@@ -118,9 +118,9 @@ export default function PrescriptionPrint() {
           </div>
         </div>
 
-        <div className="rx-grid grid grid-cols-1 gap-5 md:grid-cols-2">
-          {/* বাম পাশ: কেস টেকিং */}
-          <section className="rounded-lg border border-slate-200 print:border-slate-300 p-3 text-sm leading-relaxed break-inside-avoid">
+        <div className="rx-grid">
+          {/* বাম পাশ: ৩ ইঞ্চি কেস টেকিং */}
+          <section className="rx-case rounded-lg border border-slate-200 p-3 text-sm leading-relaxed">
             <div className="section-title mb-1.5">কেস টেকিং</div>
             <div className="space-y-1">
               {caseData.symptoms && <div><b>লক্ষণ:</b> {caseData.symptoms}</div>}
@@ -144,9 +144,12 @@ export default function PrescriptionPrint() {
             </div>
           </section>
 
-          {/* ডান পাশ: প্রেসক্রিপশন */}
+          {/* ডান পাশ: স্ট্যান্ডার্ড প্রেসক্রিপশন */}
           <section className="break-inside-avoid">
-            <div className="section-title mb-1.5">প্রেসক্রিপশন</div>
+            <div className="mb-2 flex items-baseline justify-between border-b border-slate-300 pb-1">
+              <span className="text-2xl font-serif font-bold leading-none text-slate-700">℞</span>
+              <span className="section-title">প্রেসক্রিপশন</span>
+            </div>
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b-2 border-slate-400 text-left">

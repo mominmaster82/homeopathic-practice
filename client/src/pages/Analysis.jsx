@@ -69,15 +69,13 @@ export default function Analysis() {
     try {
       let caseId = rxForm.case_id;
       if (caseId === 'new') {
-        // নির্বাচিত রুব্রিকগুলোকে লক্ষণ হিসেবে লিখে নতুন কেস তৈরি
-        const symptomTexts = rubrics
-          .filter((r) => selected.includes(r.id))
-          .map((r) => r.rubric_text)
-          .join('; ');
+        // নির্বাচিত রুব্রিকগুলো লক্ষণ হিসেবে লেখার পাশাপাশি কেসে সংরক্ষণ
+        const picked = rubrics.filter((r) => selected.includes(r.id));
         const created = await api.addCase({
           patient_id: rxForm.patient_id,
-          symptoms: symptomTexts || null,
+          symptoms: picked.map((r) => r.rubric_text).join('; ') || null,
           notes: 'বিশ্লেষণ থেকে তৈরি',
+          rubrics: picked.map((r) => ({ id: r.id, section: r.section, text: r.rubric_text })),
         });
         caseId = created.id;
       }
