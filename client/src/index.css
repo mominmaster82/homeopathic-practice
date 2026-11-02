@@ -82,3 +82,17 @@
     @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs;
   }
 }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  body {
+    background: #fff;
+  }
+  /* প্রেসক্রিপশন: বামে কেস টেকিং, ডানে প্রেসক্রিপশন */
+  .rx-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) !important;
+  }
+}

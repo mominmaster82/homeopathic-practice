@@ -1,19 +1,75 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, formatDateBD } from '../services/api.js';
-import { extraCaseFields } from './caseFields.js';
+import { searchRubrics, queryTokens } from '../utils/search.js';
+import { extraCaseFields, emptyCaseFields } from './caseFields.js';
 
 const input = 'input';
 const potencies = ['6C', '30C', '200C', '1M', '0/1 (LM)', 'Q (মাতৃটিংচার)'];
-const emptyCaseForm = {
-  patient_id: '', symptoms: '', notes: '',
-  duration: '', cause: '', aggravation: '', amelioration: '', past_medication: '',
-};
+const emptyCaseForm = { patient_id: '', rubrics: [], ...emptyCaseFields };
+
+// একবার লোড হলেই পুরো সেশনে একই তালিকা — প্রতিবার পেজে ঢুকলে রুব্রিক আবার পড়তে হয় না
+let rubricsPromise = null;
+function loadRubricsOnce() {
+  if (!rubricsPromise) rubricsPromise = api.getRubrics();
+  return rubricsPromise;
+}
+
+// ফিল্ডের লেখা থেকে মিলে যাওয়া শীর্ষ ৩টি রুব্রিক।
+// hint = ফিল্ডের নিজের বিষয় (যেমন তৃষ্ণা/ঘাম) — গদ্যের "অনেক পানি খান" থেকেও তৃষ্ণার রুব্রিক পেতে সাহায্য করে।
+function suggestRubrics(rubrics, text, hint) {
+  const q = String(text || '').trim();
+  if (!rubrics || q.length < 2) return [];
+  const tokens = [...new Set([...(hint ? [hint] : []), ...queryTokens(q)])];
+  const merged = new Map();
+  for (const t of tokens) {
+    for (const hit of searchRubrics(rubrics, t).items.slice(0, 6)) {
+      const cur = merged.get(hit.rubric.id) || { rubric: hit.rubric, matches: 0, score: 0 };
+      cur.matches += 1;
+      cur.score += hit.score;
+      merged.set(hit.rubric.id, cur);
+    }
+  }
+  return [...merged.values()]
+    .sort((a, b) => b.matches - a.matches || b.score - a.score)
+    .slice(0, 3)
+    .map((x) => x.rubric);
+}
+
+// লেখার সঙ্গে মিলে যাওয়া রুব্রিকের চিপ — ক্লিক করলেই কেসে যোগ/বাদ হয়
+function RubricSuggestions({ items, pickedIds, onToggle }) {
+  if (!items.length) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      <span className="text-[11px] text-slate-400">মিলে যাওয়া রুব্রিক:</span>
+      {items.map((r) => {
+        const added = pickedIds.includes(r.id);
+        return (
+          <button
+            key={r.id}
+            type="button"
+            onClick={() => onToggle(r)}
+            title={`${r.section} › ${r.rubric_text} — ${added ? 'যোগ করা হয়েছে, বাদ দিতে ক্লিক করুন' : 'যোগ করুন'}`}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition ${
+              added
+                ? 'border-teal-500 bg-teal-600 text-white'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-700'
+            }`}
+          >
+            <span className="font-semibold">{added ? '✓' : '+'}</span>
+            <span className="max-w-[18rem] truncate">{r.rubric_text}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function CaseTaking() {
   const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
   const [remedies, setRemedies] = useState([]);
+  const [rubrics, setRubrics] = useState(null);
   const [msg, setMsg] = useState('');
 
   // নতুন কেস ফর্ম
@@ -31,6 +87,7 @@ export default function CaseTaking() {
   useEffect(() => {
     api.getPatients().then(setPatients).catch((e) => setMsg(e.message));
     api.getRemedies().then(setRemedies).catch(() => {});
+    loadRubricsOnce().then(setRubrics).catch(() => {});
   }, []);
 
   const loadCases = useCallback((pid) => {
@@ -56,6 +113,26 @@ export default function CaseTaking() {
   };
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const isPicked = (id) => form.rubrics.some((r) => r.id === id);
+
+  const addRubric = (r) => {
+    if (isPicked(r.id)) return;
+    setForm({ ...form, rubrics: [...form.rubrics, { id: r.id, section: r.section, text: r.rubric_text }] });
+  };
+
+  const removeRubric = (id) => {
+    setForm({ ...form, rubrics: form.rubrics.filter((r) => r.id !== id) });
+  };
+
+  const gotoAnalysis = () => {
+    navigate('/analysis', { state: { rubricIds: form.rubrics.map((r) => r.id) } });
+  };
+
+  // রেপার্টরিতে যে শব্দগুলো আসলে আছে — গদ্যের অপ্রাসঙ্গিক শব্দ (যেমন "ভালোবাসেন") বাদ দিতে
+  const suggestionsFor = (text, hint) => suggestRubrics(rubrics, text, hint);
+
+  const toggleRubric = (r) => (isPicked(r.id) ? removeRubric(r.id) : addRubric(r));
 
   const submitCase = async (e) => {
     e.preventDefault();
@@ -121,11 +198,16 @@ export default function CaseTaking() {
             </select>
           </div>
           <div>
-            <label className="label">লক্ষণ</label>
+            <label className="label">বর্তমান অবস্থা / লক্ষণ</label>
             <textarea
               className={input} name="symptoms" rows={4}
-              placeholder="লক্ষণ, মডালিটি, সেনসেশন লিখুন..."
+              placeholder="রোগী এখন কী কষ্টে আছে — ব্যথার ধরন ও স্থান, ব্যথা কেমন (ছেঁড়া/দপদপে/চাবকানোর মতো), কীভাবে শুরু হলো…"
               value={form.symptoms} onChange={onChange}
+            />
+            <RubricSuggestions
+              items={suggestionsFor(form.symptoms)}
+              pickedIds={form.rubrics.map((r) => r.id)}
+              onToggle={toggleRubric}
             />
           </div>
           {extraCaseFields.map((f) => (
@@ -144,6 +226,11 @@ export default function CaseTaking() {
                   value={form[f.name]} onChange={onChange}
                 />
               )}
+              <RubricSuggestions
+                items={suggestionsFor(form[f.name], f.hint)}
+                pickedIds={form.rubrics.map((r) => r.id)}
+                onToggle={toggleRubric}
+              />
             </div>
           ))}
           <div>
@@ -154,6 +241,28 @@ export default function CaseTaking() {
               value={form.notes} onChange={onChange}
             />
           </div>
+          {form.rubrics.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-teal-200 bg-teal-50/60 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-teal-800">নির্বাচিত রুব্রিক ({form.rubrics.length})</span>
+                <button type="button" onClick={gotoAnalysis} className="text-xs font-medium text-teal-700 hover:underline">
+                  বিশ্লেষণে পাঠান →
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {form.rubrics.map((r) => (
+                  <span
+                    key={r.id}
+                    className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-white px-2 py-0.5 text-xs text-teal-800"
+                    title={`${r.section} › ${r.text}`}
+                  >
+                    <span className="max-w-[16rem] truncate">{r.text}</span>
+                    <button type="button" onClick={() => removeRubric(r.id)} className="text-teal-500 hover:text-red-600">✕</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <button className="btn btn-primary w-full">
             কেস সংরক্ষণ করো
           </button>
@@ -187,6 +296,16 @@ export default function CaseTaking() {
                       <div key={f.name} className="text-sm text-slate-700"><b className="text-slate-800">{f.label}:</b> {c[f.name]}</div>
                     ))}
                     {c.notes && <div className="text-sm text-slate-700"><b className="text-slate-800">নোট:</b> {c.notes}</div>}
+                    {c.rubrics?.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-medium text-slate-500">রুব্রিক:</span>
+                        {c.rubrics.map((r) => (
+                          <span key={r.id} className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs text-teal-800" title={`${r.section} › ${r.text}`}>
+                            {r.text}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     <div>
                       <div className="flex justify-between items-center mb-2">

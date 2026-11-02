@@ -1,15 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api, formatDateBD } from '../services/api.js';
-import { extraCaseFields } from './caseFields.js';
+import { extraCaseFields, emptyCaseFields } from './caseFields.js';
 import { buildPrescriptionMessage, buildWhatsAppUrl, normalizeWhatsAppPhone } from '../utils/whatsapp.js';
 
 const potencies = ['6C', '30C', '200C', '1M', '0/1 (LM)', 'Q (মাতৃটিংচার)'];
 const input = 'input';
-const emptyCase = {
-  symptoms: '', notes: '',
-  duration: '', cause: '', aggravation: '', amelioration: '', past_medication: '',
-};
+const emptyCase = emptyCaseFields;
 const emptyRx = { remedy_id: '', potency: '30C', dose: '' };
 
 export default function PatientProfile() {
@@ -110,11 +107,7 @@ export default function PatientProfile() {
     setEditCaseForm({
       symptoms: c.symptoms || '',
       notes: c.notes || '',
-      duration: c.duration || '',
-      cause: c.cause || '',
-      aggravation: c.aggravation || '',
-      amelioration: c.amelioration || '',
-      past_medication: c.past_medication || '',
+      ...Object.fromEntries(extraCaseFields.map((f) => [f.name, c[f.name] || ''])),
     });
     setNotice('');
   };
@@ -460,6 +453,16 @@ export default function PatientProfile() {
                         <div key={f.name} className="text-sm text-slate-700"><b className="font-semibold text-slate-800">{f.label}:</b> {c[f.name]}</div>
                       ))}
                       {c.notes && <div className="text-sm text-slate-700"><b className="font-semibold text-slate-800">নোট:</b> {c.notes}</div>}
+                      {c.rubrics?.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs font-medium text-slate-500">রুব্রিক:</span>
+                          {c.rubrics.map((r) => (
+                            <span key={r.id} className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs text-teal-800" title={`${r.section} › ${r.text}`}>
+                              {r.text}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api, formatDateBD } from '../services/api.js';
 import { extraCaseFields } from './caseFields.js';
 import { buildPrescriptionMessage, buildWhatsAppUrl } from '../utils/whatsapp.js';
+import { abbreviateRemedy } from '../utils/remedyName.js';
 
 export default function PrescriptionPrint() {
   const { caseId } = useParams();
@@ -47,6 +48,11 @@ export default function PrescriptionPrint() {
     dateText: formatDateBD(caseData.date),
   }));
 
+  const hasCaseInfo = caseData.symptoms
+    || caseData.notes
+    || (caseData.rubrics?.length > 0)
+    || extraCaseFields.some((f) => caseData[f.name]);
+
   return (
     <div className="space-y-4">
       {/* এই বাটনগুলো প্রিন্টে দেখাবে না */}
@@ -74,7 +80,7 @@ export default function PrescriptionPrint() {
       </div>
 
       {/* প্রিন্ট-বান্ধব রিসিট */}
-      <div className="card max-w-2xl mx-auto p-8 print:max-w-none print:p-0 print:bg-white print:shadow-none print:rounded-none print:border-0">
+      <div className="card rx-sheet max-w-4xl mx-auto p-6 sm:p-8 print:max-w-none print:p-0 print:bg-white print:shadow-none print:rounded-none print:border-0">
         <div className="flex items-center justify-center gap-4 border-b-2 border-teal-600 pb-3 mb-4">
           {settings.logo && (
             <img src={settings.logo} alt="লোগো" className="w-16 h-16 object-contain" />
@@ -112,49 +118,68 @@ export default function PrescriptionPrint() {
           </div>
         </div>
 
-        {(caseData.symptoms || extraCaseFields.some((f) => caseData[f.name])) && (
-          <div className="text-sm mb-4 bg-slate-50 print:bg-transparent rounded border border-slate-200 print:border-slate-300 p-2.5 leading-relaxed space-y-1">
-            {caseData.symptoms && <div><b>লক্ষণ:</b> {caseData.symptoms}</div>}
-            {extraCaseFields.map((f) => caseData[f.name] && (
-              <div key={f.name}><b>{f.label}:</b> {caseData[f.name]}</div>
-            ))}
-          </div>
-        )}
+        <div className="rx-grid grid grid-cols-1 gap-5 md:grid-cols-2">
+          {/* বাম পাশ: কেস টেকিং */}
+          <section className="rounded-lg border border-slate-200 print:border-slate-300 p-3 text-sm leading-relaxed break-inside-avoid">
+            <div className="section-title mb-1.5">কেস টেকিং</div>
+            <div className="space-y-1">
+              {caseData.symptoms && <div><b>লক্ষণ:</b> {caseData.symptoms}</div>}
+              {extraCaseFields.map((f) => caseData[f.name] && (
+                <div key={f.name}><b>{f.label}:</b> {caseData[f.name]}</div>
+              ))}
+              {caseData.rubrics?.length > 0 && (
+                <div>
+                  <b>রুব্রিক:</b>
+                  <ol className="list-decimal list-inside mt-0.5 space-y-0.5">
+                    {caseData.rubrics.map((r) => (
+                      <li key={r.id}>{r.text}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {caseData.notes && <div><b>নোট:</b> {caseData.notes}</div>}
+              {!hasCaseInfo && (
+                <div className="text-slate-400">কেস টেকিংয়ের কোনো তথ্য নেই।</div>
+              )}
+            </div>
+          </section>
 
-        <table className="w-full text-sm border-collapse mb-4">
-          <thead>
-            <tr className="border-b-2 border-slate-400 text-left">
-              <th className="py-1.5 pr-2 w-8">ক্রম</th>
-              <th className="py-1.5 pr-2 print:hidden">ওষুধ</th>
-              <th className="py-1.5 pr-2 print:hidden">শক্তি</th>
-              <th className="py-1.5">সেবনবিধি (কীভাবে খাবেন)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {caseData.prescriptions.map((p, i) => (
-              <tr key={p.id} className="border-b border-slate-200">
-                <td className="py-1.5 pr-2 align-top">{i + 1}.</td>
-                <td className="py-1.5 pr-2 font-semibold print:hidden">{p.remedy_name}</td>
-                <td className="py-1.5 pr-2 print:hidden">{p.potency || '—'}</td>
-                <td className="py-1.5 whitespace-pre-line leading-relaxed">{p.dose || '—'}</td>
-              </tr>
-            ))}
-            {caseData.prescriptions.length === 0 && (
-              <tr>
-                <td colSpan={4} className="py-3 text-center text-slate-400">কোনো ওষুধ যোগ করা হয়নি।</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-
-        {caseData.notes && (
-          <div className="text-sm mb-6 leading-relaxed">
-            <b>নোট:</b> {caseData.notes}
-          </div>
-        )}
+          {/* ডান পাশ: প্রেসক্রিপশন */}
+          <section className="break-inside-avoid">
+            <div className="section-title mb-1.5">প্রেসক্রিপশন</div>
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b-2 border-slate-400 text-left">
+                  <th className="py-1.5 pr-1.5 w-7">ক্রম</th>
+                  <th className="py-1.5 pr-1.5">ওষুধ</th>
+                  <th className="py-1.5 pr-1.5 w-14">শক্তি</th>
+                  <th className="py-1.5">সেবনবিধি</th>
+                </tr>
+              </thead>
+              <tbody>
+                {caseData.prescriptions.map((p, i) => (
+                  <tr key={p.id} className="border-b border-slate-200">
+                    <td className="py-1.5 pr-1.5 align-top">{i + 1}.</td>
+                    <td className="py-1.5 pr-1.5 align-top">
+                      <div className="font-semibold">{abbreviateRemedy(p.remedy_name)}</div>
+                      <div className="text-[11px] text-slate-500 print:hidden">{p.remedy_name}</div>
+                    </td>
+                    <td className="py-1.5 pr-1.5 align-top whitespace-nowrap">{p.potency || '—'}</td>
+                    <td className="py-1.5 whitespace-pre-line leading-relaxed">{p.dose || '—'}</td>
+                  </tr>
+                ))}
+                {caseData.prescriptions.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-3 text-center text-slate-400">কোনো ওষুধ যোগ করা হয়নি।</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </section>
+        </div>
 
         {settings.footer_note && (
-          <div className="text-xs text-slate-500 italic border-t border-dashed border-slate-300 pt-2 mb-4">
+          <div className="text-xs text-slate-500 italic border-t border-dashed border-slate-300 pt-2 mt-4 mb-4">
             {settings.footer_note}
           </div>
         )}

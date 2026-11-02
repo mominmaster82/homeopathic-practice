@@ -53,6 +53,22 @@ export function formatDateBD(value) {
 const nullable = (v) => (v === undefined || v === null || v === '' ? null : v);
 const nullableNum = (v) => (v === undefined || v === null || v === '' ? null : Number(v));
 
+// কেসে সংরক্ষিত টেক্সট-ফিল্ড (caseFields.js-এর সঙ্গে মিল রাখতে হবে)
+const CASE_TEXT_FIELDS = [
+  'symptoms', 'notes', 'duration', 'cause', 'aggravation', 'amelioration',
+  'thermal', 'thirst', 'sweat', 'appetite', 'desires', 'aversions',
+  'sleep', 'dreams', 'fears', 'constitution', 'stool', 'urine', 'past_medication',
+  'past_history', 'family_history', 'skin_diseases',
+];
+
+// কেসের সঙ্গে যুক্ত রুব্রিক — {id, section, text} (টেক্সট কপি রাখা হয় যাতে রুব্রিক মুছলেও দেখানো যায়)
+const rubricRefs = (list) =>
+  Array.isArray(list)
+    ? list
+        .filter((r) => r && r.id !== undefined && r.id !== null)
+        .map((r) => ({ id: num(r.id), section: String(r.section || ''), text: String(r.text || '') }))
+    : [];
+
 // নতুন রেকর্ডের সংখ্যা-ID (counters/main ডকুমেন্টে ট্রানজ্যাকশনে বাড়ানো হয়)
 async function nextId(field) {
   const ref = doc(db, 'counters', 'main');
@@ -582,24 +598,18 @@ const casesApi = {
   },
 
   addCase: async (data) => {
-    const {
-      patient_id, symptoms, notes,
-      duration, cause, aggravation, amelioration, past_medication,
-    } = data;
+    const { patient_id } = data;
     if (!patient_id) throw new Error('রোগী নির্বাচন করুন');
     const patient = await getOne('patients', patient_id);
     if (!patient) throw new Error('রোগী পাওয়া যায়নি');
     const id = await nextId('cases');
+    const textFields = {};
+    for (const f of CASE_TEXT_FIELDS) textFields[f] = nullable(data[f]);
     await setDoc(doc(db, 'cases', String(id)), {
       id,
       patient_id: num(patient_id),
-      symptoms: nullable(symptoms),
-      notes: nullable(notes),
-      duration: nullable(duration),
-      cause: nullable(cause),
-      aggravation: nullable(aggravation),
-      amelioration: nullable(amelioration),
-      past_medication: nullable(past_medication),
+      ...textFields,
+      rubrics: rubricRefs(data.rubrics),
       date: now(),
     });
     return { id };
@@ -609,11 +619,10 @@ const casesApi = {
     const existing = await getOne('cases', id);
     if (!existing) throw new Error('কেস পাওয়া যায়নি');
     const patch = {};
-    if (data.symptoms !== undefined) patch.symptoms = nullable(data.symptoms) ?? existing.symptoms;
-    if (data.notes !== undefined) patch.notes = nullable(data.notes) ?? existing.notes;
-    for (const f of ['duration', 'cause', 'aggravation', 'amelioration', 'past_medication']) {
+    for (const f of CASE_TEXT_FIELDS) {
       if (data[f] !== undefined) patch[f] = nullable(data[f]) ?? existing[f];
     }
+    if (data.rubrics !== undefined) patch.rubrics = rubricRefs(data.rubrics);
     await updateDoc(doc(db, 'cases', String(id)), patch);
     return { ok: true };
   },
