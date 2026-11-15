@@ -83,6 +83,30 @@
   }
 }
 
+/* কী-নোট: বোল্ড/ইটালিক/রঙ ও প্যারা-বিরতি */
+.rich-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  pointer-events: none;
+}
+.rich-text {
+  overflow-wrap: anywhere;
+}
+.rich-text > div,
+.rich-text > p {
+  margin: 0;
+}
+.rich-text > div:empty,
+.rich-text > p:empty {
+  min-height: 1.25em;
+}
+.rich-text > div + div,
+.rich-text > p + p,
+.rich-text > div + p,
+.rich-text > p + div {
+  margin-top: 0.25rem;
+}
+
 /* প্রেসক্রিপশন: বামে ৩ ইঞ্চি কেস টেকিং, ডানে প্রেসক্রিপশন */
 .rx-grid {
   display: grid;

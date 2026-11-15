@@ -14,6 +14,7 @@ import {
   isNearWord,
   bengaliSkeleton,
 } from './textMatch.js';
+import { stripRichText } from './richText.js';
 
 const EXACT_SCORE = 10;
 const SKELETON_SCORE = 7;
@@ -171,7 +172,8 @@ function remedyDoc(remedy) {
   if (cached) return cached;
 
   const doc = REMEDY_FIELDS.map(([key, weight]) => {
-    const raw = String(remedy?.[key] ?? '');
+    // কী-নোট এখন ফরম্যাটেড HTML হতে পারে — ট্যাগ বাদ দিয়ে শুধু লেখা ইনডেক্স করি
+    const raw = key === 'keynotes' ? stripRichText(remedy?.[key]) : String(remedy?.[key] ?? '');
     const words = [...new Set(wordsOf(raw))];
     return { key, weight, raw, text: words.join(' '), words, wordSet: new Set(words) };
   });

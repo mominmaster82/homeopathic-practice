@@ -30,6 +30,7 @@ import {
   signOut as signOutSecondary,
 } from 'firebase/auth';
 import { firebaseConfig, db, auth } from '../firebase.js';
+import { sanitizeRichText, isRichTextEmpty } from '../utils/richText.js';
 
 // ---------- সাধারণ হেল্পার ----------
 
@@ -290,11 +291,12 @@ const remediesApi = {
       throw new Error('এই নামে ওষুধ আগে থেকেই আছে');
     }
     const id = await nextId('remedies');
+    const keynotes = sanitizeRichText(data.keynotes);
     const row = {
       id,
       name,
       source: nullable(data.source),
-      keynotes: nullable(data.keynotes),
+      keynotes: isRichTextEmpty(keynotes) ? null : keynotes,
       clinical: nullable(data.clinical),
       better: nullable(data.better),
       worse: nullable(data.worse),
@@ -316,8 +318,12 @@ const remediesApi = {
       }
     }
     const patch = { name: newName };
-    for (const f of ['source', 'keynotes', 'clinical', 'better', 'worse']) {
+    for (const f of ['source', 'clinical', 'better', 'worse']) {
       if (data[f] !== undefined) patch[f] = nullable(data[f]);
+    }
+    if (data.keynotes !== undefined) {
+      const keynotes = sanitizeRichText(data.keynotes);
+      patch.keynotes = isRichTextEmpty(keynotes) ? null : keynotes;
     }
     await updateDoc(doc(db, 'remedies', String(id)), patch);
     return { ok: true };

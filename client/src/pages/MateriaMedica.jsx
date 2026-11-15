@@ -4,6 +4,7 @@ import { api } from '../services/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { suggestRubricsForRemedy } from '../utils/linkSuggest.js';
 import { searchRemedies } from '../utils/search.js';
+import RichTextField, { RichTextView } from '../components/RichText.jsx';
 
 // গ্রেড দেখানোর জন্য তিনটি বিন্দু (● ● ●)
 function GradeDots({ grade }) {
@@ -67,7 +68,11 @@ function RemedyForm({ initial, onSubmit, onCancel, submitLabel }) {
       </div>
       <div>
         <label className={label}>কী-নোট</label>
-        <textarea className={input} name="keynotes" rows={2} value={form.keynotes || ''} onChange={onChange} placeholder="মূল লক্ষণসমূহ" />
+        <RichTextField
+          value={form.keynotes || ''}
+          onChange={(keynotes) => setForm({ ...form, keynotes })}
+          placeholder="মূল লক্ষণসমূহ — বোল্ড, ইটালিক ও রঙ করা যাবে"
+        />
       </div>
       <div>
         <label className={label}>ক্লিনিক্যাল ব্যবহার</label>
@@ -565,7 +570,11 @@ export default function MateriaMedica() {
 
               <div className="rounded-lg border border-teal-100 bg-teal-50 p-3">
                 <div className="section-title text-teal-700 mb-1">কী-নোট</div>
-                <p className="text-sm text-slate-700">{selected.keynotes || '—'}</p>
+                {selected.keynotes ? (
+                  <RichTextView value={selected.keynotes} className="text-sm text-slate-700" />
+                ) : (
+                  <p className="text-sm text-slate-700">—</p>
+                )}
               </div>
 
               {selected.clinical && (

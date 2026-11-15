@@ -2,6 +2,7 @@
 // লিংকের প্রস্তাব তৈরি করে। প্রস্তাবগুলো কেবল সূত্র — ব্যবহারকারী যাচাই করে যোগ করবেন।
 
 import { EN_STOP, BN_STOP, normalize, wordsOf, charLen, minStemLen, stemHit } from './textMatch.js';
+import { stripRichText } from './richText.js';
 
 // এই স্কোরের নিচে মিল হলে প্রস্তাব দেখানো হয় না
 const MIN_SCORE = 2;
@@ -34,7 +35,7 @@ const REMEDY_FIELDS = [
 
 function remedyDoc(remedy) {
   return REMEDY_FIELDS.map(([key, label, weight]) => {
-    const value = remedy?.[key];
+    const value = key === 'keynotes' ? stripRichText(remedy?.[key]) : remedy?.[key];
     return {
       label,
       weight,

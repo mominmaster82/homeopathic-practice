@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api } from '../services/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { RichTextView } from '../components/RichText.jsx';
 
 export default function Analysis() {
   const location = useLocation();
@@ -204,7 +205,8 @@ export default function Analysis() {
                     <div className="px-4 pb-4 pt-3 text-sm space-y-2 border-t border-slate-100 bg-slate-50">
                       <div className="text-xs text-slate-500 italic">উৎস: {r.source}</div>
                       <div className="text-slate-700 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                        <b className="text-amber-800">কী-নোট:</b> {r.keynotes}
+                        <b className="text-amber-800">কী-নোট:</b>
+                        <RichTextView value={r.keynotes} className="mt-1" />
                       </div>
                     </div>
                   )}
