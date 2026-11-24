@@ -4,6 +4,7 @@
 
 import { extraRemedies, extraLinks } from './remedies-300.js';
 import { extraRemedies2, extraLinks2 } from './remedies-500.js';
+import { foodRubrics, foodLinks } from './foods.js';
 
 export const remedies = [
   { name: 'Aconite', source: 'Aconitum napellus', keynotes: 'হঠাৎ তীব্র শুরু, জ্বরের আগে কাঁপুনি, শুষ্ক ত্বক, ঠান্ডা শুষ্ক বাতাসে বাড়ে। মন: মৃত্যুভয়, ভিড়ে আতঙ্ক, ভবিষ্যৎ নিয়ে ভয়, কেউ কাছে এলে অস্বস্তি', clinical: 'জ্বর, সর্দি-কাশি, ক্রুপ, ভয়-উদ্বেগ, শ্বাসকষ্ট', better: 'খোলা বাতাস, ঠান্ডা, শান্ত থাকলে', worse: 'শুষ্ক ঠান্ডা বাতাস, রাতে, ভিড়-গরমে' },
@@ -967,6 +968,7 @@ export const rubrics = [
   { section: 'Mind', text: 'Timidity (ভীরুতা)' },
   { section: 'Mind', text: 'Homesickness (ঘরছাড়া কষ্ট)' },
   { section: 'Mind', text: 'Love, disappointed (প্রেমে ব্যর্থতা)' },
+  ...foodRubrics,
 ];
 
 // লিংক: rubric (section > text), remedy name, grade (১-৩)
@@ -1122,10 +1124,6 @@ export const links = [
   ['Stomach > Vomiting', 'Phosphorus', 2],
   ['Stomach > Appetite loss', 'China', 2], ['Stomach > Appetite loss', 'Pulsatilla', 3],
   ['Stomach > Appetite loss', 'Lycopodium', 2], ['Stomach > Appetite loss', 'Arsenicum album', 1],
-  ['Stomach > Craving, salt', 'Natrum mur', 3], ['Stomach > Craving, salt', 'Phosphorus', 2],
-  ['Stomach > Craving, salt', 'Sulphur', 1],
-  ['Stomach > Craving, sweets', 'Argentum nitricum', 3], ['Stomach > Craving, sweets', 'Sulphur', 3],
-  ['Stomach > Craving, sweets', 'Lycopodium', 2], ['Stomach > Craving, sweets', 'Phosphorus', 2],
   ['Stomach > Aversion to food', 'Pulsatilla', 3], ['Stomach > Aversion to food', 'China', 3],
   ['Stomach > Aversion to food', 'Arsenicum album', 2], ['Stomach > Aversion to food', 'Lycopodium', 2],
   ['Stomach > Hiccough', 'Ipecac', 2], ['Stomach > Hiccough', 'Nux vomica', 2],
@@ -1560,14 +1558,10 @@ export const links = [
   ['Throat > Throat, right-sided', 'Belladonna', 3], ['Throat > Throat, right-sided', 'Lycopodium', 2],
   ['Throat > Throat, right-sided', 'Merc sol', 1],
   // STOMACH
-  ['Stomach > Craving, sour', 'Natrum phos', 2], ['Stomach > Craving, sour', 'Pulsatilla', 2],
-  ['Stomach > Craving, sour', 'Antimonium crud', 2], ['Stomach > Craving, sour', 'Phosphorus', 1],
-  ['Stomach > Craving, sour', 'China', 1],
+  ['Stomach > Craving, sour', 'Natrum phos', 2],
   ['Stomach > Aversion to milk', 'Natrum phos', 2], ['Stomach > Aversion to milk', 'Calcarea carb', 2],
   ['Stomach > Aversion to milk', 'Mag carb', 2], ['Stomach > Aversion to milk', 'Pulsatilla', 1],
   ['Stomach > Aversion to milk', 'Silicea', 1],
-  ['Stomach > Craving, cold drinks', 'Phosphorus', 3], ['Stomach > Craving, cold drinks', 'Natrum mur', 2],
-  ['Stomach > Craving, cold drinks', 'Arsenicum album', 1], ['Stomach > Craving, cold drinks', 'Sulphur', 1],
   ['Stomach > Stomach, worse after eating', 'Nux vomica', 3], ['Stomach > Stomach, worse after eating', 'Bryonia', 2],
   ['Stomach > Stomach, worse after eating', 'Lycopodium', 2], ['Stomach > Stomach, worse after eating', 'China', 2],
   ['Stomach > Stomach, worse after eating', 'Pulsatilla', 2],
@@ -1841,13 +1835,12 @@ export const links = [
   ['Throat > Throat, worse morning', 'Merc sol', 1],
   ['Throat > Throat, raw scraping', 'Arum triphyllum', 3],
   ['Throat > Throat, dry', 'Arum triphyllum', 2], ['Throat > Throat, dry', 'Rumex crispus', 2],
-  ['Stomach > Desire, meat', 'China', 2], ['Stomach > Desire, meat', 'Natrum mur', 2],
-  ['Stomach > Desire, meat', 'Phosphorus', 2], ['Stomach > Desire, meat', 'Lycopodium', 1],
-  ['Stomach > Desire, meat', 'Sulphur', 1],
+  ['Stomach > Desire, meat', 'China', 2],
+  ['Stomach > Desire, meat', 'Phosphorus', 2],
+  ['Stomach > Desire, meat', 'Lycopodium', 1],
   ['Stomach > Aversion to meat', 'Ipecac', 2], ['Stomach > Aversion to meat', 'Colchicum', 2],
   ['Stomach > Aversion to meat', 'Lycopodium', 2], ['Stomach > Aversion to meat', 'Natrum mur', 1],
   ['Stomach > Aversion to meat', 'Pulsatilla', 1], ['Stomach > Aversion to meat', 'Aconite', 1],
-  ['Stomach > Desire, milk', 'Phosphorus', 2], ['Stomach > Desire, milk', 'Calcarea carb', 2],
   ['Stomach > Desire, milk', 'Pulsatilla', 1], ['Stomach > Desire, milk', 'Sulphur', 1],
   ['Stomach > Desire, milk', 'Chamomilla', 1],
   ['Stomach > Stomach, worse milk', 'Natrum carb', 3], ['Stomach > Stomach, worse milk', 'Calcarea carb', 1],
@@ -2181,8 +2174,6 @@ export const links = [
   ['Stomach > Appetite, ravenous', 'Iodium', 3], ['Stomach > Appetite, ravenous', 'Sulphur', 2],
   ['Stomach > Appetite, ravenous', 'Lycopodium', 2], ['Stomach > Appetite, ravenous', 'Calcarea carb', 2],
   ['Stomach > Appetite, ravenous', 'Phosphorus', 2], ['Stomach > Appetite, ravenous', 'Cina', 1],
-  ['Stomach > Craving, spicy', 'Nux vomica', 2], ['Stomach > Craving, spicy', 'Sulphur', 2],
-  ['Stomach > Craving, spicy', 'Pulsatilla', 1], ['Stomach > Craving, spicy', 'Calcarea carb', 1],
   ['Stomach > Vomiting, bilious green', 'Ipecac', 2], ['Stomach > Vomiting, bilious green', 'Antimonium tart', 2],
   ['Stomach > Vomiting, bilious green', 'Nux vomica', 2], ['Stomach > Vomiting, bilious green', 'Veratrum album', 2],
   ['Stomach > Vomiting, bilious green', 'Chelidonium', 2], ['Stomach > Vomiting, bilious green', 'Apocynum cannabinum', 1],
@@ -3428,6 +3419,7 @@ export const links = [
   ['Clinical > Herpes zoster', 'Sulphur', 1],
   ['Clinical > Hair loss', 'Calcarea carb', 1],
   ['Clinical > Vaccine reactions', 'Merc sol', 1],
+  ...foodLinks,
   ...extraLinks,
   ...extraLinks2,
 ];
