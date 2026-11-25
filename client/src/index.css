@@ -107,6 +107,52 @@
   margin-top: 0.25rem;
 }
 
+/* ডকুমেন্ট লাইব্রেরি — রেফারেন্স রিডার */
+.doc-body {
+  overflow-wrap: anywhere;
+  color: #1e293b;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.doc-body p {
+  margin: 0 0 6px;
+}
+.doc-body .doc-h2 {
+  margin: 26px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #e2e8f0;
+}
+.doc-body .doc-table-wrap {
+  margin: 10px 0 18px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.doc-body .doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.doc-body .doc-table.doc-cols-2 {
+  min-width: 560px;
+}
+.doc-body .doc-table.doc-cols-3 {
+  min-width: 680px;
+}
+.doc-body .doc-table td {
+  border: 1px solid #cbd5e1;
+  padding: 6px 8px;
+  vertical-align: top;
+}
+.doc-body .doc-table thead td {
+  font-weight: 700;
+}
+.doc-hit {
+  background: #fde68a;
+  color: inherit;
+  border-radius: 2px;
+}
+
 /* প্রেসক্রিপশন: বামে ৩ ইঞ্চি কেস টেকিং, ডানে প্রেসক্রিপশন */
 .rx-grid {
   display: grid;

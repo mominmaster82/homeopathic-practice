@@ -54,6 +54,14 @@ service cloud.firestore {
       allow read: if activeUser();
       allow write: if adminUser();
     }
+    match /documents/{id} {
+      allow read: if activeUser();
+      allow write: if adminUser();
+    }
+    match /document_contents/{id} {
+      allow read: if activeUser();
+      allow write: if adminUser();
+    }
 
     // রোগীর গোপনীয় ডেটা — সম্পূর্ণ অ্যাডমিন-সীমিত
     match /patients/{id} {

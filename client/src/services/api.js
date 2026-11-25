@@ -714,6 +714,88 @@ const settingsApi = {
   },
 };
 
+// ---------- রেফারেন্স ডকুমেন্ট লাইব্রেরি ----------
+
+// মেটাডেটা documents/{id}-এ, বড় HTML আলাদা document_contents/{id}-এ (তালিকা লোড হালকা থাকে)
+function documentError(err) {
+  const code = err?.code || '';
+  if (code === 'permission-denied') {
+    return new Error('সার্ভারে লেখার অনুমতি নেই — Firestore নিয়ম (rules) এখনো আপডেট হয়নি');
+  }
+  if (code === 'unavailable' || code === 'auth/network-request-failed') {
+    return new Error('নেটওয়ার্ক সমস্যা — ইন্টারনেট চেক করুন');
+  }
+  return err;
+}
+
+const documentsApi = {
+  // নিয়ম এখনো ডিপ্লয় না হলে পড়া ব্যর্থ হয় — বিল্ট-ইন ডকুমেন্ট তবু দেখা যাবে
+  getDocuments: async () => {
+    try {
+      const snap = await getDocs(collection(db, 'documents'));
+      return snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    } catch (err) {
+      if (err?.code === 'permission-denied') return [];
+      throw err;
+    }
+  },
+
+  getDocumentHtml: async (id) => {
+    const row = await getOne('document_contents', id);
+    return row?.html || null;
+  },
+
+  saveDocument: async (meta, html) => {
+    const title = String(meta.title || '').trim();
+    if (!title) throw new Error('ডকুমেন্টের নাম দিতে হবে');
+    if (title.length > 120) throw new Error('নাম ১২০ অক্ষরের মধ্যে রাখুন');
+    const category = String(meta.category || '').trim();
+    const subtitle = String(meta.subtitle || '').trim();
+    const source = String(meta.source || '').trim();
+    const id = meta.id
+      ? String(meta.id)
+      : `doc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const printOrientation = meta.printOrientation === 'portrait' ? 'portrait' : 'landscape';
+
+    try {
+      const existing = await getOne('documents', id);
+      let order = existing?.order;
+      if (order == null) {
+        const all = await allDocs('documents');
+        order = all.reduce((m, d) => Math.max(m, Number(d.order) || 0), 0) + 1;
+      }
+
+      const row = {
+        id,
+        title,
+        subtitle: nullable(subtitle),
+        category: nullable(category),
+        source: nullable(source),
+        printOrientation,
+        order,
+        updated_at: now(),
+      };
+      if (!existing) row.created_at = now();
+
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'documents', id), row, { merge: true });
+      if (html) {
+        batch.set(doc(db, 'document_contents', id), {
+          html,
+          chars: Number(meta.chars) || null,
+          tables: Number(meta.tables) || null,
+          rows: Number(meta.rows) || null,
+          updated_at: now(),
+        });
+      }
+      await batch.commit();
+      return { id, order };
+    } catch (err) {
+      throw documentError(err);
+    }
+  },
+};
+
 // ---------- ব্যাকআপ (version 2 ফরম্যাট — SQLite ভার্সনের সাথে সামঞ্জস্যপূর্ণ) ----------
 
 const backupApi = {
@@ -1202,6 +1284,7 @@ export const api = {
   analyze,
   ...casesApi,
   ...settingsApi,
+  ...documentsApi,
   ...backupApi,
   ...authApi,
   ...usersApi,
